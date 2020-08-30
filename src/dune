@@ -1,0 +1,5 @@
+(library
+ (name bare)
+ (public_name bare)
+ (inline_tests (backend qtest.lib))
+ (flags :standard -warn-error -a+8))
