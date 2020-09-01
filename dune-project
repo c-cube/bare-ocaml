@@ -8,4 +8,6 @@
   (synopsis "BARE encoding, see https://baremessages.org/")
   (tags (encoding binary bare))
   (license MIT)
-  (depends dune (ocaml (>= "4.08"))))
+  (depends
+    dune
+    (ocaml (>= "4.08")) (qtest (and :with-test (>= "2.10")))))

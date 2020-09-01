@@ -6,6 +6,7 @@ tags: ["encoding" "binary" "bare"]
 depends: [
   "dune"
   "ocaml" {>= "4.08"}
+  "qtest" {with-test & >= "2.10"}
 ]
 build: [
   ["dune" "subst"] {pinned}
