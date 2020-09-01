@@ -32,7 +32,7 @@ end = struct
     {out; buf}
 
   let add_prelude self =
-    fpf self.out "[@@@@@@ocaml.warning \"-8-26-27\"]@.";
+    fpf self.out "[@@@@@@ocaml.warning \"-26-27\"]@.";
     ()
 
   let code self = fpf self.out "@."; Buffer.contents self.buf
@@ -105,8 +105,8 @@ end = struct
             n := i + 1;
         )
         l;
-      fpf self "| @[x -> failwith@ \
-                (Printf.sprintf \"unknown enum member for %s.t: %%Ld\" x)@]@]@,"
+      fpf self "| @[x -> raise (Bare.Decode.Error@ \
+                (Printf.sprintf \"unknown enum member for %s.t: %%Ld\" x))@]@]@,"
         (String.capitalize_ascii _name);
     end;
     ()
@@ -163,17 +163,20 @@ end = struct
       fpf self "@[<2>Array.init %d@ (@[fun _ ->@ %a@])@]" len recurse ty
     | A.Array {ty; len=None} ->
       fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
-                 if len>Int64.of_int Sys.max_array_length then failwith \"array too big\";@ \
+                if len>Int64.of_int Sys.max_array_length then \
+                  raise (Bare.Decode.Error\"array too big\");@ \
                 @[<2>Array.init (Int64.to_int len)@ (@[fun _ -> %a@])@]@])" recurse ty
     | A.Map (String, b) ->
       fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
-                 if len>Int64.of_int max_int then failwith \"array too big\";@ \
+                if len>Int64.of_int max_int then \
+                 raise (Bare.Decode.Error \"array too big\");@ \
                  @[<2>List.init (Int64.to_int len)@ (@[<v>fun _ ->@ \
                 let k = Bare.Decode.string dec in@ let v = %a in@ k,v@])@]@ \
                 |> List.to_seq |> Bare.String_map.of_seq@])" recurse b
     | A.Map (a, b) ->
       fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
-                if len>Int64.of_int Sys.max_array_length  then failwith \"array too big\";@ \
+                if len>Int64.of_int Sys.max_array_length \
+                then raise (Bare.Decode.Error \"array too big\");@ \
                  @[<2>List.init (Int64.to_int len)@ (@[fun _ ->@ \
                 let k = %a in@ let v = %a@ in k,v@])@]@])" recurse a recurse b
     | A.Struct l ->
@@ -199,8 +202,8 @@ end = struct
            fpf self "| @[%dL ->@ %s (%a)@]@," i
              (union_elt_name ~ty_name i ty) (cg_ty_decode ~root:false ~ty_name) ty)
         l;
-      fpf self "| @[_ -> failwith \
-                (Printf.sprintf \"unknown union tag %s.t: %%Ld\" tag)@]@," ty_name
+      fpf self "| @[_ -> raise (Bare.Decode.Error\
+                (Printf.sprintf \"unknown union tag %s.t: %%Ld\" tag))@]@," ty_name
 
   (* codegen for encoding [x] into [enc] *)
   let rec cg_ty_encode (x:string) ~root ~ty_name (self:fmt) (ty:A.ty_expr) : unit =
