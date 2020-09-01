@@ -1,6 +1,7 @@
 
-(executable
+(test
   (name example1)
+  (modules example1 try1)
   (libraries bare)
   (flags :standard -warn-error -a))
 
@@ -8,3 +9,4 @@
   (targets example1.ml)
   (deps example1.bare)
   (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
+
