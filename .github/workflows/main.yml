@@ -19,6 +19,7 @@ jobs:
       name: cache
       with:
         path: ~/.opam
+        key: ${{ runner.os }}
     - run: opam install -t . --deps-only
     - run: opam exec -- dune build
     - run: opam exec -- dune runtest
