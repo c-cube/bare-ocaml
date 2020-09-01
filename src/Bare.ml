@@ -1,4 +1,6 @@
 
+module String_map = Map.Make(String)
+
 let spf = Printf.sprintf
 
 module Decode = struct
@@ -8,6 +10,8 @@ module Decode = struct
     bs: bytes;
     mutable off: int;
   }
+
+  type 'a dec = t -> 'a
 
   let fail_ e = raise (Error e)
   let fail_eof_ what =
@@ -42,10 +46,68 @@ module Decode = struct
       )
     in
     res
+
+  let u8 self : char =
+    let x = Bytes.get self.bs self.off in
+    self.off <- self.off + 1;
+    x
+  let i8 = u8
+
+  let u16 self =
+    let x = Bytes.get_int16_le self.bs self.off in
+    self.off <- self.off + 2;
+    x
+  let i16 = u16
+
+  let u32 self =
+    let x = Bytes.get_int32_le self.bs self.off in
+    self.off <- self.off + 4;
+    x
+  let i32 = u32
+
+  let u64 self =
+    let i = Bytes.get_int64_le self.bs self.off in
+    self.off <- 8 + self.off;
+    i
+  let i64 = u64
+
+  let bool self : bool =
+    let c = Bytes.get self.bs self.off in
+    self.off <- 1 + self.off;
+    Char.code c <> 0
+
+  let f32 (self:t) : float =
+    let i = i32 self in
+    Int32.float_of_bits i
+
+  let f64 (self:t) : float =
+    let i = i64 self in
+    Int64.float_of_bits i
+
+  let data_of ~size self : bytes =
+    let s = Bytes.sub self.bs self.off size in
+    self.off <- self.off + size;
+    s
+
+  let data self : bytes =
+    let size = uint self in
+    if Int64.compare size (Int64.of_int Sys.max_string_length) > 0 then
+      fail_ "string too large";
+    let size = Int64.to_int size in (* fits, because of previous test *)
+    data_of ~size self
+
+  let string self : string =
+    Bytes.unsafe_to_string (data self)
+
+  let[@inline] optional dec self : _ option =
+    let c = u8 self in
+    if Char.code c = 0 then None else Some (dec self)
 end
 
 module Encode = struct
   type t = Buffer.t
+
+  type 'a enc = t -> 'a -> unit
 
   let uint (self:t) i : unit =
     let open Int64 in
@@ -67,6 +129,36 @@ module Encode = struct
     let open Int64 in
     let ui = logxor (shift_left i 1) (shift_right i 63) in
     uint self ui
+
+  let u8 self x = Buffer.add_char self x
+  let i8 = u8
+  let u16 self x = Buffer.add_int16_le self x
+  let i16 = u16
+  let u32 self x = Buffer.add_int32_le self x
+  let i32 = u32
+  let u64 self x = Buffer.add_int64_le self x
+  let i64 = u64
+
+  let bool self x = Buffer.add_char self (if x then Char.chr 1 else Char.chr 0)
+
+  let f64 (self:t) x = Buffer.add_int64_le self (Int64.bits_of_float x)
+
+  let data_of ~size self x =
+    if size <> Bytes.length x then failwith "invalid length for Encode.data_of";
+    Buffer.add_bytes self x
+
+  let data self x =
+    uint self (Int64.of_int (Bytes.length x));
+    Buffer.add_bytes self x
+
+  let string self x = data self (Bytes.unsafe_of_string x)
+
+  let[@inline] optional enc self x : unit =
+    match x with
+    | None -> u8 self (Char.chr 0)
+    | Some x ->
+      u8 self (Char.chr 1);
+      enc self x
 end
 
 (*$inject
