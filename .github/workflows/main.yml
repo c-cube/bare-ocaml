@@ -15,6 +15,10 @@ jobs:
         ocaml-version: ${{ matrix.ocaml-version }}
     - run: opam pin -n .
     - run: opam depext -yt bare
+    - uses: actions/cache@v2
+      name: cache
+      with:
+        path: ~/.opam
     - run: opam install -t . --deps-only
     - run: opam exec -- dune build
     - run: opam exec -- dune runtest
