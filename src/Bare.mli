@@ -62,4 +62,15 @@ module Encode : sig
   val optional : 'a enc -> 'a option enc
 end
 
+val of_bytes_exn : ?off:int -> 'a Decode.dec -> bytes -> 'a
+(** @raise Decode.Error if decoding fails *)
+
+val of_bytes : ?off:int -> 'a Decode.dec -> bytes -> ('a, string) result
+
+val of_string_exn : 'a Decode.dec -> string -> 'a
+(** @raise Decode.Error if decoding fails *)
+
+val of_string : 'a Decode.dec -> string -> ('a, string) result
+
+val to_string : 'a Encode.enc -> 'a -> string
 

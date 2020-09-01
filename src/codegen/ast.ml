@@ -47,16 +47,18 @@ let flatten_types (defs: ty_def list) : ty_def list =
   let cnt = ref 0 in
   let new_defs = ref [] in
   let addef d = new_defs := d :: !new_defs in
-  let rec aux_ty ~root ~ty_name ty =
-    let recurse = aux_ty ~ty_name ~root:false in
+  let rec aux_ty ~root path ty =
+    let recurse ?(path=path) ty = aux_ty path ~root:false ty in
     match ty with
     | Array {ty;len} -> Array {len;ty=recurse ty}
     | Map (a,b) -> Map(recurse a, recurse b)
     | Struct l when root ->
-      Struct (List.map (fun (n,ty) -> n, recurse ty)l )
+      Struct (List.map (fun (n,ty) -> n, recurse ~path:(n::path) ty)l )
     | Struct l ->
       (* introduce a name for this sub-struct *)
-      let new_name = Printf.sprintf "%s_aux_%d" ty_name !cnt in
+      let new_name =
+        let path = String.concat "_" @@ List.rev path in
+        Printf.sprintf "%s_%d" path !cnt in
       incr cnt;
       begin
         (* side definition for this new type *)
@@ -71,8 +73,8 @@ let flatten_types (defs: ty_def list) : ty_def list =
   and aux_def ({name;def} as td) =
     let def = match def with
       | Enum _ -> def
-      | Atomic ty -> Atomic (aux_ty ~root:true ~ty_name:name ty)
-      | Union l -> Union (List.map (aux_ty ~root:false ~ty_name:name) l)
+      | Atomic ty -> Atomic (aux_ty ~root:true [name] ty)
+      | Union l -> Union (List.map (aux_ty ~root:false [name]) l)
     in
     addef {td with def};
   in

@@ -161,6 +161,23 @@ module Encode = struct
       enc self x
 end
 
+let to_string (e:'a Encode.enc) (x:'a) =
+  let buf = Buffer.create 32 in
+  e buf x;
+  Buffer.contents buf
+
+let of_bytes_exn ?(off=0) dec bs =
+  let i = {Decode.bs; off} in
+  dec i
+
+let of_bytes ?off dec bs =
+  try Ok (of_bytes_exn ?off dec bs)
+  with Decode.Error e -> Error e
+
+let of_string_exn dec s = of_bytes_exn dec (Bytes.unsafe_of_string s)
+let of_string dec s = of_bytes dec (Bytes.unsafe_of_string s)
+
+
 (*$inject
   let to_s f x =
     let out = Buffer.create 32 in

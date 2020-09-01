@@ -33,8 +33,6 @@ end = struct
 
   let add_prelude self =
     fpf self.out "[@@@@@@ocaml.warning \"-8-26-27\"]@.";
-    fpf self.out "module BD = Bare.Decode@.";
-    fpf self.out "module BE = Bare.Encode@.";
     ()
 
   let code self = fpf self.out "@."; Buffer.contents self.buf
@@ -142,39 +140,39 @@ end = struct
     let recurse = cg_ty_decode ~root:false ~ty_name in
     match ty with
     | A.Named_ty s -> fpf self "%s.decode dec" (String.capitalize_ascii s)
-    | A.Uint -> addstr self "BD.uint dec"
-    | A.Int -> addstr self "BD.int dec"
-    | A.U8 -> addstr self "BD.i8 dec"
-    | A.I8 -> addstr self "BD.u8 dec"
-    | A.U16 -> addstr self "BD.u16 ec"
-    | A.I16 -> addstr self "BD.i16 dec"
-    | A.U32 -> addstr self "BD.u32 ec"
-    | A.I32 -> addstr self "BD.i32 dec"
-    | A.U64 -> addstr self "BD.u64 ec"
-    | A.I64 -> addstr self "BD.i64 dec"
-    | A.F32 -> addstr self "BD.f32 dec"
-    | A.F64 -> addstr self "BD.f64 dec"
-    | A.Bool -> addstr self "BD.bool dec"
-    | A.String -> addstr self "BD.string dec"
-    | A.Data {len=None} -> addstr self "BD.data dec"
-    | A.Data {len=Some n} -> fpf self "BD.data_of ~size:%d dec" n
+    | A.Uint -> addstr self "Bare.Decode.uint dec"
+    | A.Int -> addstr self "Bare.Decode.int dec"
+    | A.U8 -> addstr self "Bare.Decode.i8 dec"
+    | A.I8 -> addstr self "Bare.Decode.u8 dec"
+    | A.U16 -> addstr self "Bare.Decode.u16 ec"
+    | A.I16 -> addstr self "Bare.Decode.i16 dec"
+    | A.U32 -> addstr self "Bare.Decode.u32 ec"
+    | A.I32 -> addstr self "Bare.Decode.i32 dec"
+    | A.U64 -> addstr self "Bare.Decode.u64 ec"
+    | A.I64 -> addstr self "Bare.Decode.i64 dec"
+    | A.F32 -> addstr self "Bare.Decode.f32 dec"
+    | A.F64 -> addstr self "Bare.Decode.f64 dec"
+    | A.Bool -> addstr self "Bare.Decode.bool dec"
+    | A.String -> addstr self "Bare.Decode.string dec"
+    | A.Data {len=None} -> addstr self "Bare.Decode.data dec"
+    | A.Data {len=Some n} -> fpf self "Bare.Decode.data_of ~size:%d dec" n
     | A.Void -> addstr self "()"
     | A.Optional ty ->
-      fpf self "@[<2>BD.optional@ (@[fun dec ->@ %a@]) dec@]" recurse ty
+      fpf self "@[<2>Bare.Decode.optional@ (@[fun dec ->@ %a@]) dec@]" recurse ty
     | A.Array {ty; len=Some len} ->
       fpf self "@[<2>Array.init %d@ (@[fun _ ->@ %a@])@]" len recurse ty
     | A.Array {ty; len=None} ->
-      fpf self "(@[<v>let len = BD.uint dec in@ \
+      fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
                  if len>Int64.of_int Sys.max_array_length then failwith \"array too big\";@ \
                 @[<2>Array.init (Int64.to_int len)@ (@[fun _ -> %a@])@]@])" recurse ty
     | A.Map (String, b) ->
-      fpf self "(@[<v>let len = BD.uint dec in@ \
+      fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
                  if len>Int64.of_int Sys.max_array_length  then failwith \"array too big\";@ \
                  @[<2>List.init (Int64.to_int len)@ (@[<v>fun _ ->@ \
-                let k = BD.string dec in@ let v = %a in@ k,v@])@]@ \
+                let k = Bare.Decode.string dec in@ let v = %a in@ k,v@])@]@ \
                 |> List.to_seq |> Bare.String_map.of_seq@])" recurse b
     | A.Map (a, b) ->
-      fpf self "(@[<v>let len = BD.uint dec in@ \
+      fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
                 if len>Int64.of_int Sys.max_array_length  then failwith \"array too big\";@ \
                  @[<2>List.init (Int64.to_int len)@ (@[fun _ ->@ \
                 let k = %a in@ let v = %a@ in k,v@])@]@])" recurse a recurse b
@@ -193,9 +191,9 @@ end = struct
     match def with
     | A.Atomic ty -> cg_ty_decode ~root:true ~ty_name self ty
     | A.Enum _ ->
-      fpf self "of_int (BD.uint dec)";
+      fpf self "of_int (Bare.Decode.uint dec)";
     | A.Union l ->
-      fpf self "let tag = BD.uint dec in@ match tag with@ ";
+      fpf self "let tag = Bare.Decode.uint dec in@ match tag with@ ";
       List.iteri
         (fun i ty ->
            fpf self "| @[%dL ->@ %s (%a)@]@," i
@@ -209,38 +207,38 @@ end = struct
     let recurse x = cg_ty_encode ~root:false ~ty_name x in
     match ty with
     | A.Named_ty s -> fpf self "%s.encode enc %s" (String.capitalize_ascii s) x
-    | A.Uint -> fpf self "BE.uint enc %s" x
-    | A.Int -> fpf self "BE.int enc %s" x
-    | A.U8 -> fpf self "BE.i8 enc %s" x
-    | A.I8 -> fpf self "BE.u8 enc %s" x
-    | A.U16 -> fpf self "BE.u16 enc %s" x
-    | A.I16 -> fpf self "BE.i16 enc %s" x
-    | A.U32 -> fpf self "BE.u32 enc %s" x
-    | A.I32 -> fpf self "BE.i32 enc %s" x
-    | A.U64 -> fpf self "BE.u64 enc %s" x
-    | A.I64 -> fpf self "BE.i64 enc %s" x
-    | A.F32 -> fpf self "BE.f32 enc %s" x
-    | A.F64 -> fpf self "BE.f64 enc %s" x
-    | A.Bool -> fpf self "BE.bool enc %s" x
-    | A.String -> fpf self "BE.string enc %s" x
-    | A.Data {len=None} -> fpf self "BE.data enc %s" x
-    | A.Data {len=Some n} -> fpf self "BE.data_of ~size:%d enc %s" n x
+    | A.Uint -> fpf self "Bare.Encode.uint enc %s" x
+    | A.Int -> fpf self "Bare.Encode.int enc %s" x
+    | A.U8 -> fpf self "Bare.Encode.i8 enc %s" x
+    | A.I8 -> fpf self "Bare.Encode.u8 enc %s" x
+    | A.U16 -> fpf self "Bare.Encode.u16 enc %s" x
+    | A.I16 -> fpf self "Bare.Encode.i16 enc %s" x
+    | A.U32 -> fpf self "Bare.Encode.u32 enc %s" x
+    | A.I32 -> fpf self "Bare.Encode.i32 enc %s" x
+    | A.U64 -> fpf self "Bare.Encode.u64 enc %s" x
+    | A.I64 -> fpf self "Bare.Encode.i64 enc %s" x
+    | A.F32 -> fpf self "Bare.Encode.f32 enc %s" x
+    | A.F64 -> fpf self "Bare.Encode.f64 enc %s" x
+    | A.Bool -> fpf self "Bare.Encode.bool enc %s" x
+    | A.String -> fpf self "Bare.Encode.string enc %s" x
+    | A.Data {len=None} -> fpf self "Bare.Encode.data enc %s" x
+    | A.Data {len=Some n} -> fpf self "Bare.Encode.data_of ~size:%d enc %s" n x
     | A.Void -> fpf self "()"
     | A.Optional ty ->
-      fpf self "@[<2>BE.optional@ (@[fun enc xopt ->@ %a@]) enc %s@]" (recurse "xopt") ty x
+      fpf self "@[<2>Bare.Encode.optional@ (@[fun enc xopt ->@ %a@]) enc %s@]" (recurse "xopt") ty x
     | A.Array {ty; len=Some _len} ->
       fpf self "@[<2>Array.iter (@[fun xi ->@ %a@])@ %s@]" (recurse "xi") ty x
     | A.Array {ty; len=None} ->
       fpf self "(@[<v>let arr = %s in@ \
-                BE.uint enc (Int64.of_int (Array.length arr));@ \
+                Bare.Encode.uint enc (Int64.of_int (Array.length arr));@ \
                 @[Array.iter (@[fun xi ->@ %a@])@ arr@]@])" x (recurse "xi") ty
     | A.Map (String, b) ->
       fpf self "(@[<v>let m = %s in@ \
-                BE.uint enc (Int64.of_int (Bare.String_map.cardinal m));@ \
-                @[<2>Bare.String_map.iter@ (@[fun x y ->@ BE.string enc x;@ %a@])@ %s@]@])"
+                Bare.Encode.uint enc (Int64.of_int (Bare.String_map.cardinal m));@ \
+                @[<2>Bare.String_map.iter@ (@[fun x y ->@ Bare.Encode.string enc x;@ %a@])@ %s@]@])"
         x (recurse "y") b x
     | A.Map (a, b) ->
-      fpf self "(@[<v>BE.uint enc (Int64.of_int (List.length %s));
+      fpf self "(@[<v>Bare.Encode.uint enc (Int64.of_int (List.length %s));
                 @[<2>List.iter@ (@[fun (x,y) ->@ %a;@ %a@])@ %s@]@])"
         x (recurse "x") a (recurse "y") b x
     | A.Struct l ->
@@ -261,13 +259,13 @@ end = struct
     match def with
     | A.Atomic ty -> cg_ty_encode "self" ~root:true ~ty_name self ty
     | A.Enum _ ->
-      fpf self "BE.uint enc (to_int self)";
+      fpf self "Bare.Encode.uint enc (to_int self)";
     | A.Union l ->
       fpf self "@[<hv>match self with@ ";
       List.iteri
         (fun i ty ->
            fpf self "| @[<v>%s x ->@ \
-                     BE.uint enc %dL;@ \
+                     Bare.Encode.uint enc %dL;@ \
                      %a@]@,"
              (union_elt_name ~ty_name i ty) i
              (cg_ty_encode ~root:false ~ty_name "x") ty)
@@ -281,7 +279,7 @@ end = struct
       | _ -> ()
     end;
     fpf self "@,(** @raise Bare.Decode.Error in case of error. *)@,\
-              @[<2>let decode (dec: BD.t) : t =@ %a@]@,"
+              @[<2>let decode (dec: Bare.Decode.t) : t =@ %a@]@,"
       (cg_ty_def_rhs_decode name) def;
     fpf self "@,@[<2>let encode (enc: Bare.Encode.t) (self: t) : unit =@ %a@]@,"
       (cg_ty_def_rhs_encode name) def;
