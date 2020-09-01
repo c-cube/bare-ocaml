@@ -1,9 +1,13 @@
 
-(test
-  (name example1)
+(executable
+  (name try1)
   (modules example1 try1)
   (libraries bare)
   (flags :standard -warn-error -a))
+
+(rule
+  (alias runtest)
+  (action (run ./try1.exe)))
 
 (rule
   (targets example1.ml)

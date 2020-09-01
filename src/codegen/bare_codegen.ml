@@ -167,7 +167,7 @@ end = struct
                 @[<2>Array.init (Int64.to_int len)@ (@[fun _ -> %a@])@]@])" recurse ty
     | A.Map (String, b) ->
       fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
-                 if len>Int64.of_int Sys.max_array_length  then failwith \"array too big\";@ \
+                 if len>Int64.of_int max_int then failwith \"array too big\";@ \
                  @[<2>List.init (Int64.to_int len)@ (@[<v>fun _ ->@ \
                 let k = Bare.Decode.string dec in@ let v = %a in@ k,v@])@]@ \
                 |> List.to_seq |> Bare.String_map.of_seq@])" recurse b
@@ -222,19 +222,21 @@ end = struct
     | A.Bool -> fpf self "Bare.Encode.bool enc %s" x
     | A.String -> fpf self "Bare.Encode.string enc %s" x
     | A.Data {len=None} -> fpf self "Bare.Encode.data enc %s" x
-    | A.Data {len=Some n} -> fpf self "Bare.Encode.data_of ~size:%d enc %s" n x
+    | A.Data {len=Some n} ->
+      fpf self "(@[assert (Bytes.length %s=%d);@ \
+                 Bare.Encode.data_of ~size:%d enc %s@])" x n n x
     | A.Void -> fpf self "()"
     | A.Optional ty ->
       fpf self "@[<2>Bare.Encode.optional@ (@[fun enc xopt ->@ %a@]) enc %s@]" (recurse "xopt") ty x
-    | A.Array {ty; len=Some _len} ->
-      fpf self "@[<2>Array.iter (@[fun xi ->@ %a@])@ %s@]" (recurse "xi") ty x
+    | A.Array {ty; len=Some len} ->
+      fpf self "(@[<2>assert (Array.length %s = %d);@ \
+                Array.iter (@[fun xi ->@ %a@])@ %s@])" x len (recurse "xi") ty x
     | A.Array {ty; len=None} ->
       fpf self "(@[<v>let arr = %s in@ \
                 Bare.Encode.uint enc (Int64.of_int (Array.length arr));@ \
                 @[Array.iter (@[fun xi ->@ %a@])@ arr@]@])" x (recurse "xi") ty
     | A.Map (String, b) ->
-      fpf self "(@[<v>let m = %s in@ \
-                Bare.Encode.uint enc (Int64.of_int (Bare.String_map.cardinal m));@ \
+      fpf self "(@[<v>Bare.Encode.uint enc (Int64.of_int (Bare.String_map.cardinal %s));@ \
                 @[<2>Bare.String_map.iter@ (@[fun x y ->@ Bare.Encode.string enc x;@ %a@])@ %s@]@])"
         x (recurse "y") b x
     | A.Map (a, b) ->
@@ -252,7 +254,6 @@ end = struct
         l;
       fpf self "@;<1 -2>end@]";
       ()
-
 
   (* codegen for encoding *)
   let cg_ty_def_rhs_encode ty_name (self:fmt) (def:A.ty_def_rhs) : unit =
