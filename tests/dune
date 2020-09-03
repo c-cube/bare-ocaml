@@ -1,13 +1,29 @@
 
 (executable
   (name try1)
-  (modules example1 try1)
+  (modules try1)
+  (libraries bare example1)
+  (flags :standard -warn-error -a))
+
+(executable
+  (name try2)
+  (modules try2)
+  (libraries bare example1)
+  (flags :standard -warn-error -a))
+
+(library
+  (name example1)
+  (modules example1)
   (libraries bare)
   (flags :standard -warn-error -a))
 
 (rule
   (alias runtest)
   (action (run ./try1.exe)))
+
+(rule
+  (alias runtest)
+  (action (run ./try2.exe)))
 
 (rule
   (targets example1.ml)
