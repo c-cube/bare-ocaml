@@ -318,25 +318,32 @@ let parse_file f : A.ty_def list =
 let normalize_defs defs =
   A.flatten_types defs
 
-let codegen ~out defs : unit =
+let codegen ~to_stdout ~out defs : unit =
   let cg = CG.create() in
   CG.add_prelude cg;
   List.iter (CG.encode_ty_def cg) defs;
   if !debug then Printf.eprintf "generate code into %S\n" out;
-  let oc = open_out out in
-  CG.write_code oc cg;
-  flush oc;
-  close_out oc;
+  if out <> "" then (
+    let oc = open_out out in
+    CG.write_code oc cg;
+    flush oc;
+    close_out oc;
+  );
+  if to_stdout then (
+    CG.write_code stdout cg;
+  );
   ()
 
 let () =
   let files = ref [] in
   let cat = ref false in
   let out = ref "" in
+  let stdout = ref false in
   let opts = [
     "--cat", Arg.Set cat, " print type definitions";
     "-d", Arg.Set debug, " debug mode";
-    "-o", Arg.Set_string out, " set output file for codegen";
+    "-o", Arg.Set_string out, " codegen: print code to given file";
+    "--stdout", Arg.Set stdout, " codegen: print code to stdout"
   ] |> Arg.align in
   Arg.parse opts (fun f -> files := f :: !files) "usage: bare-codegen [opt]* file+";
   let tys = List.map parse_file (List.rev !files) |> List.flatten in
@@ -344,8 +351,8 @@ let () =
     List.iter (fun td -> Format.printf "%a@.@." A.pp_ty_def td) tys;
   );
   let tys = normalize_defs tys in
-  if !out <> "" then (
-    codegen ~out:!out tys
+  if !stdout || !out <> "" then (
+    codegen ~to_stdout:!stdout ~out:!out tys
   );
   ()
 
