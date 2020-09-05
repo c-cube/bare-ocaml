@@ -2,7 +2,7 @@
 module E = Example1
 
 let () =
-  print_endline "\nrun encoding test 2\n";
+  print_endline ">>> run encoding test 2";
   let p1 = E.Person.Employee
       {E.Employee. name="bar"; email="bar@iHaveAVeryLongEmailRight.edu.ac.co.uk";
        department=E.Department.CUSTOMER_SERVICE;

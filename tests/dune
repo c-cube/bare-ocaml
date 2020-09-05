@@ -11,6 +11,12 @@
   (libraries bare example1)
   (flags :standard -warn-error -a))
 
+(executable
+  (name try_ex2)
+  (modules example2 try_ex2)
+  (libraries bare)
+  (flags :standard -warn-error -a))
+
 (library
   (name example1)
   (modules example1)
@@ -24,9 +30,17 @@
 (rule
   (alias runtest)
   (action (run ./try2.exe)))
+(rule
+  (alias runtest)
+  (action (run ./try_ex2.exe)))
 
 (rule
   (targets example1.ml)
   (deps example1.bare)
+  (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
+
+(rule
+  (targets example2.ml)
+  (deps example2.bare)
   (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
 

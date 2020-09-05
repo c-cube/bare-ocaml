@@ -2,7 +2,7 @@
 module E = Example1
 
 let () =
-  print_endline "\nrun encoding test 1\n";
+  print_endline ">>> run encoding test 1";
   let p1 = E.Person.Customer
       {E.Customer. name="foo"; email="foo@bar.com";
        orders=[|{E.Customer_orders_0.orderId=97L; quantity=106l}|];

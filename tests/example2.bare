@@ -1,0 +1,28 @@
+
+# tests around mutually recursive types
+
+type Person {
+  first: string
+  last: string
+}
+
+type PTreeNil void
+
+type PTreeNode {
+  left: PTree
+  person: Person
+  right: PTree
+}
+
+type PTree (PTreeNil | PTreeNode)
+
+
+type Rec1 {
+  a1: string
+  r2: optional<Rec2>
+}
+
+type Rec2 {
+  a2: i16
+  r1: optional<Rec1>
+}

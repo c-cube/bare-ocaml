@@ -12,13 +12,6 @@ enum Department {
   JSMITH = 99
 }
 
-type Address {
-  address: [4]string
-  city: string
-  state: string
-  country: string
-}
-
 type Customer {
   name: string
   email: string
@@ -41,3 +34,10 @@ type Employee {
 }
 
 type Person (Customer | Employee)
+
+type Address {
+  address: [4]string
+  city: string
+  state: string
+  country: string
+}
