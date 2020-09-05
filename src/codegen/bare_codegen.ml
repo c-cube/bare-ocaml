@@ -12,7 +12,7 @@ module CG : sig
   val create : unit -> t
   val add_prelude : t -> unit
 
-  val encode_ty_def : t -> A.ty_def -> unit
+  val encode_ty_defs : t -> A.ty_def list -> unit
 
   val code : t -> string
   val write_code : out_channel -> t -> unit
@@ -38,11 +38,18 @@ end = struct
   let code self = fpf self.out "@."; Buffer.contents self.buf
   let write_code oc self = fpf self.out "@."; Buffer.output_buffer oc self.buf
 
-  (* codegen type definition *)
-  let rec cg_ty_ty ~root (self:fmt) (ty:A.ty_expr) : unit =
-    let recurse = cg_ty_ty ~root:false in
+  (* codegen type definition.
+     root: is [ty] directly at the top of a definition
+     clique: other types in the same mutually-recursive clique as [ty] *)
+  let rec cg_ty_ty ~root ~clique (self:fmt) (ty:A.ty_expr) : unit =
+    let recurse = cg_ty_ty ~root:false ~clique in
     match ty with
-    | A.Named_ty s -> fpf self "%s.t" (String.capitalize_ascii s)
+    | A.Named_ty {name;_} ->
+      if List.mem name clique then (
+        fpf self "%s" (String.uncapitalize_ascii name)
+      ) else (
+        fpf self "%s.t" (String.capitalize_ascii name)
+      )
     | A.Uint | A.Int -> addstr self "int64"
     | A.U8 | A.I8 -> addstr self "char"
     | A.U16 | A.I16 -> addstr self "int"
@@ -59,22 +66,22 @@ end = struct
     | A.Map (a, b) -> fpf self "@[(@[%a *@ %a@]) list@]" recurse a recurse b
     | A.Struct l ->
       assert root; (* flattened *)
-      fpf self (if List.length l <= 2 then "@, @[<hv>{@[" else "@, @[<v>{@[<v>");
+      fpf self "{@,";
       List.iteri
         (fun i (name,ty) ->
            if i>0 then fpf self ";@ ";
            fpf self "%s: %a" name recurse ty)
         l;
-      fpf self "@]@,}@]"
+      fpf self "@;<0 -2>}"
 
   (* named for the i-th element of an union *)
   let union_elt_name ~ty_name i (ty:A.ty_expr) : string =
     match ty with
-    | Named_ty s -> String.capitalize_ascii s
+    | Named_ty {name;_} -> String.capitalize_ascii name
     | _ -> spf "%s_%d" (String.capitalize_ascii ty_name) i
 
   (* for [enum name l], produce int64<->t conversions *)
-  let cg_enum_conv self _name l =
+  let cg_enum_conv self _name l : unit =
     fpf self "@,@[<hv2>let to_int = function@,";
     begin
       let n = ref 0 in
@@ -112,12 +119,12 @@ end = struct
     ()
 
   (* codegen for type definition of this type def *)
-  let cg_ty_def_rhs_def ty_name self (tyd:A.ty_def_rhs) : unit =
+  let cg_ty_def_rhs_def ~lead ~self_ty ~clique ty_name self (tyd:A.ty_def_rhs) : unit =
     match tyd with
     | A.Atomic ty ->
-      fpf self "@[<2>type t =@ %a@]@," (cg_ty_ty ~root:true) ty
+      fpf self "@[<v2>%s %s = %a@]@," lead self_ty (cg_ty_ty ~clique ~root:true) ty
     | A.Enum l ->
-      fpf self "@[<hv2>type t =@ ";
+      fpf self "@[<hv2>%s %s =@ " lead self_ty;
       List.iteri
         (fun i (n,_) ->
            if i>0 then fpf self "@ | ";
@@ -125,21 +132,31 @@ end = struct
         l;
       fpf self "@]@ "
     | A.Union l ->
-      fpf self "@[<v2>type t =@ ";
+      fpf self "@[<v2>%s %s =@ " lead self_ty;
       List.iteri
         (fun i ty ->
            let name = union_elt_name ~ty_name i ty in
            match ty with
-           | Void -> fpf self "| %s@ " name
-           | _ -> fpf self "| @[%s of %a@]@ " name (cg_ty_ty ~root:false) ty)
+           | Named_ty{is_void=true;_} | Void -> fpf self "| %s@ " name
+           | _ -> fpf self "| @[%s of %a@]@ " name (cg_ty_ty ~clique ~root:false) ty)
         l;
       fpf self "@]@,"
 
   (* codegen for decoding *)
-  let rec cg_ty_decode ~root ~ty_name (self:fmt) (ty:A.ty_expr) : unit =
-    let recurse = cg_ty_decode ~root:false ~ty_name in
+  let rec cg_ty_decode ~root ~clique ~ty_name (self:fmt) (ty:A.ty_expr) : unit =
+    let recurse = cg_ty_decode ~clique ~root:false ~ty_name in
     match ty with
-    | A.Named_ty s -> fpf self "%s.decode dec" (String.capitalize_ascii s)
+    | A.Named_ty {name;is_void=true} ->
+      (* refer to the constructor instead *)
+      let cstor = union_elt_name ~ty_name:name (-1) ty in
+      addstr self cstor
+    | A.Named_ty {name;_} ->
+      if List.mem name clique then (
+        (* use the recursion callback *)
+        fpf self "!_decode_%s dec" (String.uncapitalize_ascii name)
+      ) else (
+        fpf self "%s.decode dec" (String.capitalize_ascii name)
+      )
     | A.Uint -> addstr self "Bare.Decode.uint dec"
     | A.Int -> addstr self "Bare.Decode.int dec"
     | A.U8 -> addstr self "Bare.Decode.i8 dec"
@@ -190,26 +207,38 @@ end = struct
       fpf self "@]}@]"
 
   (* codegen for decoding *)
-  let cg_ty_def_rhs_decode ty_name (self:fmt) (def:A.ty_def_rhs) : unit =
+  let cg_ty_def_rhs_decode ~clique ty_name (self:fmt) (def:A.ty_def_rhs) : unit =
     match def with
-    | A.Atomic ty -> cg_ty_decode ~root:true ~ty_name self ty
+    | A.Atomic ty -> cg_ty_decode ~clique ~root:true ~ty_name self ty
     | A.Enum _ ->
       fpf self "of_int (Bare.Decode.uint dec)";
     | A.Union l ->
       fpf self "let tag = Bare.Decode.uint dec in@ match tag with@ ";
       List.iteri
         (fun i ty ->
-           fpf self "| @[%dL ->@ %s (%a)@]@," i
-             (union_elt_name ~ty_name i ty) (cg_ty_decode ~root:false ~ty_name) ty)
+           let cstor = union_elt_name ~ty_name i ty in
+           match ty with
+           | Named_ty {is_void=true;_} ->
+             (* nullary *)
+             fpf self "| @[%dL ->@ %s@]@ " i cstor
+           | _ ->
+             fpf self "| @[%dL ->@ %s (%a)@]@ " i
+               cstor (cg_ty_decode ~clique ~root:false ~ty_name) ty)
         l;
       fpf self "| @[_ -> raise (Bare.Decode.Error\
                 (Printf.sprintf \"unknown union tag %s.t: %%Ld\" tag))@]@," ty_name
 
   (* codegen for encoding [x] into [enc] *)
-  let rec cg_ty_encode (x:string) ~root ~ty_name (self:fmt) (ty:A.ty_expr) : unit =
-    let recurse x = cg_ty_encode ~root:false ~ty_name x in
+  let rec cg_ty_encode (x:string) ~clique ~root ~ty_name (self:fmt) (ty:A.ty_expr) : unit =
+    let recurse x = cg_ty_encode ~clique ~root:false ~ty_name x in
     match ty with
-    | A.Named_ty s -> fpf self "%s.encode enc %s" (String.capitalize_ascii s) x
+    | A.Named_ty {name;_} ->
+      if List.mem name clique then (
+        (* use the recursion callback *)
+        fpf self "!_encode_%s enc %s" (String.uncapitalize_ascii name) x
+      ) else (
+        fpf self "%s.encode enc %s" (String.capitalize_ascii name) x
+      )
     | A.Uint -> fpf self "Bare.Encode.uint enc %s" x
     | A.Int -> fpf self "Bare.Encode.int enc %s" x
     | A.U8 -> fpf self "Bare.Encode.i8 enc %s" x
@@ -259,43 +288,98 @@ end = struct
       ()
 
   (* codegen for encoding *)
-  let cg_ty_def_rhs_encode ty_name (self:fmt) (def:A.ty_def_rhs) : unit =
+  let cg_ty_def_rhs_encode ty_name ~clique (self:fmt) (def:A.ty_def_rhs) : unit =
     match def with
-    | A.Atomic ty -> cg_ty_encode "self" ~root:true ~ty_name self ty
+    | A.Atomic ty -> cg_ty_encode "self" ~clique ~root:true ~ty_name self ty
     | A.Enum _ ->
       fpf self "Bare.Encode.uint enc (to_int self)";
     | A.Union l ->
       fpf self "@[<hv>match self with@ ";
       List.iteri
         (fun i ty ->
-           fpf self "| @[<v>%s x ->@ \
-                     Bare.Encode.uint enc %dL;@ \
-                     %a@]@,"
-             (union_elt_name ~ty_name i ty) i
-             (cg_ty_encode ~root:false ~ty_name "x") ty)
+           let cstor = union_elt_name ~ty_name i ty in
+           match ty with
+           | A.Void | A.Named_ty {is_void=true;_} ->
+             fpf self "| @[<v>%s ->@ \
+                       Bare.Encode.uint enc %dL@]@," cstor i
+           | _ ->
+             fpf self "| @[<v>%s x ->@ \
+                       Bare.Encode.uint enc %dL;@ \
+                       %a@]@,"
+               cstor i (cg_ty_encode ~clique ~root:false ~ty_name "x") ty)
         l
 
-  (* in the scope of a module, define type and functions *)
-  let cg_ty_def_in_mod name self def =
-    cg_ty_def_rhs_def name self def;
+  (* define encoding/decoding/annex functions for [def] *)
+  let cg_ty_encode_decode ~clique name self def : unit =
     begin match def with
-      | Enum l -> cg_enum_conv self name l
+      | A.Enum l -> cg_enum_conv self name l
       | _ -> ()
     end;
     fpf self "@,(** @raise Bare.Decode.Error in case of error. *)@,\
-              @[<2>let decode (dec: Bare.Decode.t) : t =@ %a@]@,"
-      (cg_ty_def_rhs_decode name) def;
-    fpf self "@,@[<2>let encode (enc: Bare.Encode.t) (self: t) : unit =@ %a@]@,"
-      (cg_ty_def_rhs_encode name) def;
+              @[<v2>let decode (dec: Bare.Decode.t) : t =@ %a@]@,"
+      (cg_ty_def_rhs_decode ~clique name) def;
+    fpf self "@,@[<v2>let encode (enc: Bare.Encode.t) (self: t) : unit =@ %a@]@,"
+      (cg_ty_def_rhs_encode ~clique name) def;
     ()
 
-  let encode_ty_def (self:t) (d:A.ty_def) : unit =
-    let {A.name; def} = d in
-    fpf self.out "@[<v2>module %s = struct@," (String.capitalize_ascii name);
-    fpf self.out "%a" (cg_ty_def_in_mod name) def;
-    fpf self.out "@]@.end@.@.";
-    ()
+  let encode_ty_def_scc (self:t) (defs:A.ty_def list) : unit =
+    match defs with
+    | [{A.def=Atomic Void; name}] ->
+      if !debug then Format.eprintf "skip void type %s@." name;
+      ()
+    | [d] ->
+      let {A.name; def} = d in
+      if !debug then Format.eprintf "codegen for type %s@." name;
+      fpf self.out "@[<v2>module %s = struct@," (String.capitalize_ascii name);
+      cg_ty_def_rhs_def ~lead:"type" ~self_ty:"t"
+        name ~clique:[name] self.out def;
+      fpf self.out "%a" (cg_ty_encode_decode ~clique:[name] name) def;
+      fpf self.out "@]@.end@.@.";
+      ()
+    | [] -> assert false
+    | defs ->
+      (* first, declare all types in a mutually recursive block *)
+      let clique = List.map (fun d->d.A.name) defs in
+      if !debug then Format.eprintf "codegen for types [%s]@." (String.concat "," clique);
+      fpf self.out "@[<v>";
+      List.iteri
+        (fun i {A.name; def} ->
+          let lead = if i=0 then "type" else "and" in
+          let self_ty = String.uncapitalize_ascii name in
+          cg_ty_def_rhs_def ~lead ~self_ty name ~clique self.out def)
+        defs;
+      fpf self.out "@]@,";
+      (* forward declarations for the mutually recursive functions *)
+      List.iter
+        (fun {A.name;_} ->
+          let self_ty = String.uncapitalize_ascii name in
+          fpf self.out "let _encode_%s = ref (fun _ _ -> assert false)@," self_ty;
+          fpf self.out "let _decode_%s = ref (fun _ -> assert false)@," self_ty;
+        ) defs;
+      (* now build one module for each type *)
+      List.iter
+        (fun {A.name; def} ->
+          fpf self.out "@[<v2>module %s = struct@," (String.capitalize_ascii name);
+          (* alias+redeclare type *)
+          let self_ty = String.uncapitalize_ascii name in
+          let self_ty' = spf "t = %s" self_ty in
+          cg_ty_def_rhs_def ~lead:"type" ~self_ty:self_ty' name ~clique self.out def;
+          fpf self.out "%a" (cg_ty_encode_decode ~clique name) def;
+          (* fill forward references *)
+          fpf self.out "@,(* fill forward declarations *)@,";
+          fpf self.out "let () = _encode_%s := encode@," self_ty;
+          fpf self.out "let () = _decode_%s := decode@," self_ty;
+          fpf self.out "@]@.end@.@.")
+        defs;
+      ()
 
+  let encode_ty_defs (self:t) (defs:A.ty_def list) : unit =
+    let defs =
+      A.flatten_types defs
+      |> A.replace_void_defs
+      |> A.Find_scc.top
+    in
+    List.iter (encode_ty_def_scc self) defs
 end
 
 let parse_file f : A.ty_def list =
@@ -315,13 +399,10 @@ let parse_file f : A.ty_def list =
     close_in_noerr ic;
     raise e
 
-let normalize_defs defs =
-  A.flatten_types defs
-
 let codegen ~to_stdout ~out defs : unit =
   let cg = CG.create() in
   CG.add_prelude cg;
-  List.iter (CG.encode_ty_def cg) defs;
+  CG.encode_ty_defs cg defs;
   if !debug then Printf.eprintf "generate code into %S\n" out;
   if out <> "" then (
     let oc = open_out out in
@@ -350,7 +431,6 @@ let () =
   if !cat then (
     List.iter (fun td -> Format.printf "%a@.@." A.pp_ty_def td) tys;
   );
-  let tys = normalize_defs tys in
   if !stdout || !out <> "" then (
     codegen ~to_stdout:!stdout ~out:!out tys
   );

@@ -52,7 +52,7 @@ ty:
   | DATA LEFT_ANGLE INT RIGHT_ANGLE { Data {len=Some (int_of_string $3)}  }
   | IDENT {
     try List.assoc $1 ty_expr_l
-    with Not_found -> Ast.Named_ty $1
+    with Not_found -> Ast.Named_ty {name=$1; is_void=false}
   }
   | OPTIONAL LEFT_ANGLE ty RIGHT_ANGLE { Optional $3 }
   | LEFT_BRACKET RIGHT_BRACKET ty { Array {ty=$3; len=None} }
