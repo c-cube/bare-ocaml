@@ -7,16 +7,9 @@ let spf = Printf.sprintf
 
 let debug = ref false
 
-module CG : sig
-  type t
-  val create : unit -> t
-  val add_prelude : t -> unit
 
-  val encode_ty_defs : t -> A.ty_def list -> unit
 
-  val code : t -> string
-  val write_code : out_channel -> t -> unit
-end = struct
+module CG : Codegen.S = struct
   type fmt = Format.formatter
   type t = {
     buf: Buffer.t;
