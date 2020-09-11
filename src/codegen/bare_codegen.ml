@@ -415,24 +415,48 @@ let codegen ~to_stdout ~out defs : unit =
   );
   ()
 
+
+type lang =
+  | ML
+  | C
+
+let parse_lang str =
+  match str with
+  | "ml" -> ML
+  | "c" -> C
+  | lang -> raise (Invalid_argument ("Unknown lang value: " ^ lang))
+
+
+let lang_to_string str =
+  match str with
+  | ML -> "ml"
+  | C -> "c"
+
+
 let () =
   let files = ref [] in
   let cat = ref false in
   let out = ref "" in
   let stdout = ref false in
+  let lang = ref ML in
   let opts = [
     "--cat", Arg.Set cat, " print type definitions";
     "-d", Arg.Set debug, " debug mode";
     "-o", Arg.Set_string out, " codegen: print code to given file";
+    "-l", Arg.String (fun str -> lang := parse_lang str), " lang: ml|c (default=ml)";
     "--stdout", Arg.Set stdout, " codegen: print code to stdout"
   ] |> Arg.align in
   Arg.parse opts (fun f -> files := f :: !files) "usage: bare-codegen [opt]* file+";
+  print_endline (">>> Generating " ^ lang_to_string !lang);
   let tys = List.map parse_file (List.rev !files) |> List.flatten in
+
   if !cat then (
     List.iter (fun td -> Format.printf "%a@.@." A.pp_ty_def td) tys;
   );
   if !stdout || !out <> "" then (
-    codegen ~to_stdout:!stdout ~out:!out tys
+    match !lang with
+    | ML -> codegen ~to_stdout:!stdout ~out:!out tys
+    | C -> Bare_codegen_c.codegen ~to_stdout:!stdout ~out:!out tys
   );
   ()
 

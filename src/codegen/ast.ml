@@ -49,7 +49,7 @@ let iter_ty f (ty:ty_expr) : unit =
   let rec aux ty =
     f ty;
     match ty with
-    | Array {ty;len=_} -> aux ty
+    | Array {ty;len=_ } -> aux ty
     | Map (a,b) -> aux a; aux b
     | Struct l -> List.iter (fun (_,u) -> aux u) l
     | Optional ty -> aux ty
