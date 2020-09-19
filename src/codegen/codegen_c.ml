@@ -22,7 +22,19 @@ module CG : Codegen.S = struct
     {out; buf}
 
   let add_prelude self =
-    fpf self.out "/* THIS CODE IS GENERATED */@.";
+    fpf self.out "/* THIS CODE IS GENERATED */@.@.";
+    fpf self.out "typedef char bool;          // Represent bools as chars@.";
+    fpf self.out "typedef char[1024] string;  // Using fixed size strings@.@.";
+    fpf self.out "typedef unsigned char u8;@.";
+    fpf self.out "typedef unsigned short int u16;@.";
+    fpf self.out "typedef unsigned long int u32;@.";
+    fpf self.out "typedef unsigned long long int u64;@.@.";
+    fpf self.out "typedef signed char i8;@.";
+    fpf self.out "typedef signed short int i16;@.";
+    fpf self.out "typedef signed long int i32;@.";
+    fpf self.out "typedef signed long long int i64;@.@.";
+    fpf self.out "typedef float f32;@.";
+    fpf self.out "typedef double f64;@.@.";
     ()
 
   let code self = fpf self.out "@."; Buffer.contents self.buf
@@ -40,12 +52,17 @@ module CG : Codegen.S = struct
       ) else (
         fpf self "%s.t" (String.capitalize_ascii name)
       )
-    | A.Uint | A.Int -> addstr self "int64"
-    | A.U8 | A.I8 -> addstr self "char"
-    | A.U16 | A.I16 -> addstr self "int"
-    | A.U32 | A.I32 -> addstr self "int32"
-    | A.U64 | A.I64 -> addstr self "int64"
-    | A.F32 | A.F64 -> addstr self "float"
+    | A.Uint | A.Int -> raise Not_found
+    | A.U8 -> addstr self "u8"
+    | A.I8 -> addstr self "i8"
+    | A.U16 -> addstr self "u16"
+    | A.I16 -> addstr self "i16"
+    | A.U32 -> addstr self "u32"
+    | A.I32 -> addstr self "i32"
+    | A.U64 -> addstr self "u64"
+    | A.I64 -> addstr self "i64"
+    | A.F32 -> addstr self "f32"
+    | A.F64 -> addstr self "f64"
     | A.Bool -> addstr self "bool"
     | A.String -> addstr self "string"
     | A.Data _ -> addstr self "bytes"
@@ -112,11 +129,11 @@ module CG : Codegen.S = struct
     match tyd with
     | A.Atomic ty ->
 
-      fpf self
-        "@[<v2>%s %a %s@];@,"
-        typedef
-        (pp_ty_expr ~clique ~root:true) ty
-        type_name
+        fpf self
+          "@[<v2>%s %a %s@];@,"
+          typedef
+          (pp_ty_expr ~clique ~root:true) ty
+          type_name
 
     | A.Enum enum_items ->
         fpf self "@[<hv2>typedef enum {@;";
