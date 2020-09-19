@@ -52,7 +52,7 @@ module CG : Codegen.S = struct
       ) else (
         fpf self "%s.t" (String.capitalize_ascii name)
       )
-    | A.Uint | A.Int -> raise Not_found
+    | A.Uint | A.Int -> raise (Failure "Currently not implemented")
     | A.U8 -> addstr self "u8"
     | A.I8 -> addstr self "i8"
     | A.U16 -> addstr self "u16"
