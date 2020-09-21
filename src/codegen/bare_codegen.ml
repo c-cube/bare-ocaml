@@ -9,7 +9,7 @@ let debug = ref false
 
 module CG : sig
   type t
-  val create : unit -> t
+  val create : ?pp:bool -> unit -> t
   val add_prelude : t -> unit
 
   val encode_ty_defs : t -> A.ty_def list -> unit
@@ -19,6 +19,7 @@ module CG : sig
 end = struct
   type fmt = Format.formatter
   type t = {
+    pp: bool;
     buf: Buffer.t;
     out: fmt;
   }
@@ -26,10 +27,10 @@ end = struct
   let fpf (self:fmt) fmt = Format.fprintf self fmt
   let addstr self = Format.pp_print_string self
 
-  let create () : t =
+  let create ?(pp=false) () : t =
     let buf = Buffer.create 1024 in
     let out = Format.formatter_of_buffer buf in
-    {out; buf}
+    {out; buf; pp}
 
   let add_prelude self =
     fpf self.out "[@@@@@@ocaml.warning \"-26-27\"]@.";
@@ -400,8 +401,8 @@ let parse_file f : A.ty_def list =
     close_in_noerr ic;
     raise e
 
-let codegen ~to_stdout ~out defs : unit =
-  let cg = CG.create() in
+let codegen ~pp ~to_stdout ~out defs : unit =
+  let cg = CG.create ~pp () in
   CG.add_prelude cg;
   CG.encode_ty_defs cg defs;
   if !debug then Printf.eprintf "generate code into %S\n" out;
@@ -419,10 +420,12 @@ let codegen ~to_stdout ~out defs : unit =
 let () =
   let files = ref [] in
   let cat = ref false in
+  let pp = ref false in
   let out = ref "" in
   let stdout = ref false in
   let opts = [
     "--cat", Arg.Set cat, " print type definitions";
+    "--pp", Arg.Set pp, " generate pretty printers";
     "-d", Arg.Set debug, " debug mode";
     "-o", Arg.Set_string out, " codegen: print code to given file";
     "--stdout", Arg.Set stdout, " codegen: print code to stdout"
@@ -433,7 +436,7 @@ let () =
     List.iter (fun td -> Format.printf "%a@.@." A.pp_ty_def td) tys;
   );
   if !stdout || !out <> "" then (
-    codegen ~to_stdout:!stdout ~out:!out tys
+    codegen ~to_stdout:!stdout ~out:!out ~pp:!pp tys
   );
   ()
 
