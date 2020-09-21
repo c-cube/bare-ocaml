@@ -33,6 +33,7 @@ end = struct
 
   let add_prelude self =
     fpf self.out "[@@@@@@ocaml.warning \"-26-27\"]@.";
+    fpf self.out "module Bare = Bare_encoding@.";
     ()
 
   let code self = fpf self.out "@."; Buffer.contents self.buf

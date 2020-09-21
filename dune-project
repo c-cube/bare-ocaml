@@ -1,11 +1,11 @@
 (lang dune 2.5)
 (generate_opam_files true)
-(name bare)
+(name bare_encoding)
 
 (implicit_transitive_deps false)
 
 (package
-  (name bare)
+  (name bare_encoding)
   (synopsis "BARE encoding, see https://baremessages.org/")
   (tags (encoding binary bare))
   (license MIT)

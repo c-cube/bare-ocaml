@@ -2,7 +2,7 @@
 (executable
   (name bare_codegen)
   (public_name bare-codegen)
-  (package bare)
+  (package bare_encoding)
   (flags :standard -warn-error -a+8))
 
 (ocamllex (modules bare_lexer))

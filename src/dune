@@ -1,5 +1,5 @@
 (library
- (name bare)
- (public_name bare)
+ (name bare_encoding)
+ (public_name bare_encoding)
  (inline_tests (backend qtest.lib))
  (flags :standard -warn-error -a+8))

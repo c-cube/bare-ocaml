@@ -1,5 +1,6 @@
 
 module E = Example1
+module Bare = Bare_encoding
 
 let () =
   print_endline ">>> run encoding test 1";
