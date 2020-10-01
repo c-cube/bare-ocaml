@@ -1,4 +1,6 @@
 
+open Bare_codegen
+
 let debug = ref false
 
 let parse_file f : Ast.ty_def list =

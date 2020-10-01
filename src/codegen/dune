@@ -1,8 +1,16 @@
 (executable
- (name bare_codegen)
+ (name main)
+ (modules Main)
  (public_name bare-codegen)
  (package bare)
- (flags :standard -warn-error -a+8))
+ (flags :standard -warn-error -a+8)
+ (libraries bare.codegen))
+
+(library
+  (name bare_codegen)
+  (public_name bare.codegen)
+  (modules :standard \ Main)
+  (flags :standard -warn-error -a+8))
 
 (ocamllex
  (modules bare_lexer))

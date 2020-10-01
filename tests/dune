@@ -37,10 +37,10 @@
 (rule
   (targets example1.ml)
   (deps example1.bare)
-  (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
+  (action (run ../src/codegen/main.exe %{deps} -o %{targets})))
 
 (rule
   (targets example2.ml)
   (deps example2.bare)
-  (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
+  (action (run ../src/codegen/main.exe %{deps} -o %{targets})))
 
