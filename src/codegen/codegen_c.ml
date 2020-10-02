@@ -24,7 +24,7 @@ module CG : Codegen.S = struct
   let add_prelude self =
     fpf self.out "/* THIS CODE IS GENERATED */@.@.";
     fpf self.out "typedef char bool;          // Represent bools as chars@.";
-    fpf self.out "typedef char[1024] string;  // Using fixed size strings@.@.";
+    fpf self.out "typedef char string[1024];  // Using fixed size strings@.@.";
     fpf self.out "typedef unsigned char u8;@.";
     fpf self.out "typedef unsigned short int u16;@.";
     fpf self.out "typedef unsigned long int u32;@.";
@@ -34,8 +34,9 @@ module CG : Codegen.S = struct
     fpf self.out "typedef signed long int i32;@.";
     fpf self.out "typedef signed long long int i64;@.@.";
     fpf self.out "typedef float f32;@.";
-    fpf self.out "typedef double f64;@.@.";
-    ()
+    fpf self.out "typedef double f64;@.";
+    fpf self.out "typedef char bytes[1024];@.@."
+
 
   let code self = fpf self.out "@."; Buffer.contents self.buf
   let write_code oc self = fpf self.out "@."; Buffer.output_buffer oc self.buf
@@ -65,8 +66,9 @@ module CG : Codegen.S = struct
     | A.F64 -> addstr self "f64"
     | A.Bool -> addstr self "bool"
     | A.String -> addstr self "string"
-    | A.Data _ -> addstr self "bytes"
     | A.Void -> addstr self "unit"
+    | A.Data { len = None } -> addstr self "bytes"
+    | A.Data { len = Some n } -> fpf self "u8[%d]" n
     | A.Optional ty -> fpf self "%a option" recurse ty
     | A.Array {ty; len=_} -> fpf self "@[%a@ array@]" recurse ty
     | A.Map (String, b) -> fpf self "@[%a@ Bare.String_map.t@]" recurse b
@@ -75,8 +77,12 @@ module CG : Codegen.S = struct
       assert root; (* flattened *)
       fpf self "struct {@,";
       List.iter
-        (fun (name,ty) ->
-           fpf self "%a %s;@ " recurse ty name )
+        (fun (name, ty) ->
+          match ty with
+          | A.Data { len = Some n } ->
+            fpf self "u8 %s[%d];@ " name n
+          | _ ->
+            fpf self "%a %s;@ " recurse ty name)
         l;
       fpf self "@;<0 -2>}"
 
