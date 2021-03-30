@@ -1,7 +1,8 @@
 
 # Bare-OCaml ![build](https://github.com/c-cube/bare/workflows/build/badge.svg)
 
-A simple code generator and runtime library for [BARE](https://baremessages.org/).
+A simple code generator and runtime library for [BARE](https://baremessages.org/)
+following [the spec](https://datatracker.ietf.org/doc/draft-devault-bare).
 
 License: MIT.
 
