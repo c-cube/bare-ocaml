@@ -219,7 +219,7 @@ end = struct
         (fun i ty ->
            let cstor = union_elt_name ~ty_name i ty in
            match ty with
-           | Named_ty {is_void=true;_} ->
+           | Named_ty {is_void=true;_} | Void ->
              (* nullary *)
              fpf self "| @[%dL ->@ %s@]@ " i cstor
            | _ ->
