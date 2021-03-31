@@ -26,3 +26,11 @@ type Rec2 {
   a2: i16
   r1: optional<Rec1>
 }
+
+type PTree2 (void | PTree2Node)
+
+type PTree2Node {
+  left: PTree2
+  i: int
+  right: PTree2
+}
