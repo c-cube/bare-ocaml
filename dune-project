@@ -1,4 +1,4 @@
-(lang dune 2.5)
+(lang dune 2.8)
 (generate_opam_files true)
 (name bare_encoding)
 
