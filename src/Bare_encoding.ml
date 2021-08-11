@@ -109,23 +109,29 @@ module Encode = struct
 
   type 'a enc = t -> 'a -> unit
 
-  let uint (self:t) i : unit =
-    let open Int64 in
-    let rec loop i =
-      if equal i (logand i 0b0111_1111L) then (
-        let i = to_int i land 0xff in
-        Buffer.add_char self (Char.chr i)
+  (* no need to check for overflow below *)
+  external unsafe_chr : int -> char = "%identity"
+
+  let uint (self:t) (i:int64) : unit =
+    let module I = Int64 in
+    let i = ref i in
+    let continue = ref true in
+    while !continue do
+      let j = I.logand 0b0111_1111L !i in
+      if !i = j then (
+        continue := false;
+        let j = I.to_int j in
+        Buffer.add_char self (unsafe_chr j)
       ) else (
         (* set bit 8 to [1] *)
-        let lsb = 0b1000_0000 lor to_int (logand 0b0111_1111L i) in
-        let i = shift_right_logical i 7 in
-        Buffer.add_char self (Char.chr lsb);
-        loop i
+        let lsb = I.to_int (I.logor 0b1000_0000L j) in
+        let lsb = (unsafe_chr lsb) in
+        Buffer.add_char self lsb;
+        i := I.shift_right_logical !i 7;
       )
-    in
-    loop i
+    done
 
-  let int (self:t) i =
+  let[@inline] int (self:t) i =
     let open Int64 in
     let ui = logxor (shift_left i 1) (shift_right i 63) in
     uint self ui
