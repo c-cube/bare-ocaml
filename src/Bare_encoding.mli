@@ -36,7 +36,9 @@ end
 
 
 module Encode : sig
-  type t = Buffer.t
+  type t
+
+  val of_buffer : Buffer.t -> t
 
   type 'a enc = t -> 'a -> unit
 

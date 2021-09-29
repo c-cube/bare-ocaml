@@ -107,6 +107,8 @@ end
 module Encode = struct
   type t = Buffer.t
 
+  let of_buffer buf : t = buf
+
   type 'a enc = t -> 'a -> unit
 
   (* no need to check for overflow below *)
