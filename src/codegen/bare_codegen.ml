@@ -70,8 +70,8 @@ end = struct
       fpf self "{@,";
       List.iteri
         (fun i (name,ty) ->
-           if i>0 then fpf self ";@ ";
-           fpf self "%s: %a" name recurse ty)
+           if i>0 then fpf self "@ ";
+           fpf self "%s: %a;" name recurse ty)
         l;
       fpf self "@;<0 -2>}"
 
