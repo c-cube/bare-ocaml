@@ -188,9 +188,10 @@ let of_string dec s = of_bytes dec (Bytes.unsafe_of_string s)
 
 (*$inject
   let to_s f x =
-    let out = Buffer.create 32 in
+    let buf = Buffer.create 32 in
+    let out = Encode.of_buffer buf in
     f out x;
-    Buffer.contents out
+    Buffer.contents buf
 
   let of_s f x =
     let i = {Decode.off=0; bs=Bytes.unsafe_of_string x} in
