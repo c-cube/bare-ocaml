@@ -10,7 +10,10 @@ let debug = ref false
 module CG : sig
   type t
   val create : unit -> t
-  val add_prelude : t -> unit
+
+  val add_prelude : standalone:bool -> t -> unit
+  (** @param standalone if true, add the runtime
+      library into the code to get a standalone module *)
 
   val encode_ty_defs : t -> A.ty_def list -> unit
 
@@ -31,9 +34,13 @@ end = struct
     let out = Format.formatter_of_buffer buf in
     {out; buf}
 
-  let add_prelude self =
+  let add_prelude ~standalone self =
     fpf self.out "[@@@@@@ocaml.warning \"-26-27\"]@.";
-    fpf self.out "module Bare = Bare_encoding@.";
+    if standalone then (
+      fpf self.out "module Bare = %s end@." Embeded_lib.code;
+    ) else (
+      fpf self.out "module Bare = Bare_encoding@.";
+    );
     ()
 
   let code self = fpf self.out "@."; Buffer.contents self.buf
@@ -400,9 +407,9 @@ let parse_file f : A.ty_def list =
     close_in_noerr ic;
     raise e
 
-let codegen ~to_stdout ~out defs : unit =
+let codegen ~standalone ~to_stdout ~out defs : unit =
   let cg = CG.create() in
-  CG.add_prelude cg;
+  CG.add_prelude ~standalone cg;
   CG.encode_ty_defs cg defs;
   if !debug then Printf.eprintf "generate code into %S\n" out;
   if out <> "" then (
@@ -420,11 +427,13 @@ let () =
   let files = ref [] in
   let cat = ref false in
   let out = ref "" in
+  let standalone = ref false in
   let stdout = ref false in
   let opts = [
     "--cat", Arg.Set cat, " print type definitions";
     "-d", Arg.Set debug, " debug mode";
     "-o", Arg.Set_string out, " codegen: print code to given file";
+    "--standalone", Arg.Set standalone, " generate standalone code";
     "--stdout", Arg.Set stdout, " codegen: print code to stdout"
   ] |> Arg.align in
   Arg.parse opts (fun f -> files := f :: !files) "usage: bare-codegen [opt]* file+";
@@ -433,7 +442,7 @@ let () =
     List.iter (fun td -> Format.printf "%a@.@." A.pp_ty_def td) tys;
   );
   if !stdout || !out <> "" then (
-    codegen ~to_stdout:!stdout ~out:!out tys
+    codegen ~standalone:!standalone ~to_stdout:!stdout ~out:!out tys
   );
   ()
 

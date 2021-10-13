@@ -5,5 +5,10 @@
   (package bare_encoding)
   (flags :standard -warn-error -a+8))
 
+(rule
+  (targets embeded_lib.ml)
+  (deps ../Bare_encoding.ml)
+  (action (with-stdout-to %{targets} (run ./tool/embed.exe %{deps}))))
+
 (ocamllex (modules bare_lexer))
 (ocamlyacc (modules bare_parser))
