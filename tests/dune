@@ -23,6 +23,11 @@
   (libraries bare_encoding)
   (flags :standard -warn-error -a))
 
+(library
+  (name example2_sa)
+  (modules example2_standalone)
+  (flags :standard -warn-error -a))
+
 (rule
   (alias runtest)
   (action (run ./try1.exe)))
@@ -30,6 +35,7 @@
 (rule
   (alias runtest)
   (action (run ./try2.exe)))
+
 (rule
   (alias runtest)
   (action (run ./try_ex2.exe)))
@@ -44,3 +50,7 @@
   (deps example2.bare)
   (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
 
+(rule
+  (targets example2_standalone.ml)
+  (deps example2.bare)
+  (action (run ../src/codegen/bare_codegen.exe --standalone %{deps} -o %{targets})))

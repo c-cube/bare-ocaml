@@ -37,7 +37,9 @@ end = struct
   let add_prelude ~standalone self =
     fpf self.out "[@@@@@@ocaml.warning \"-26-27\"]@.";
     if standalone then (
-      fpf self.out "module Bare = %s end@." Embeded_lib.code;
+      fpf self.out "@.(* embedded runtime library *)@.\
+                    @[<v>@[<2>module Bare = struct@ %s@]@ end@]\
+                    @.@." Embeded_lib.code;
     ) else (
       fpf self.out "module Bare = Bare_encoding@.";
     );
