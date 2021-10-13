@@ -2,10 +2,17 @@
 let () =
   let code =
     let ic = open_in Sys.argv.(1) in
-    let len = in_channel_length ic in
-    let buf = Bytes.create len in
-    really_input ic buf 0 len;
-    Bytes.unsafe_to_string buf
+
+    let b = Bytes.create 128 in
+    let buf = Buffer.create 128 in
+    let continue = ref true in
+
+    while !continue do
+      let n = input ic b 0 (Bytes.length b) in
+      if n = 0 then continue := false
+      else Buffer.add_subbytes buf b 0 n
+    done;
+    Buffer.contents buf
   in
 
   Printf.printf "let code = %S\n%!" code
