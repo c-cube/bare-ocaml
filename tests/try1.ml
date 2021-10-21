@@ -1,5 +1,6 @@
 
 module E = Example1
+module Foo_ = Example1_pp (* just refer to it *)
 module Bare = Bare_encoding
 
 let () =

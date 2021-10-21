@@ -64,6 +64,24 @@ module Encode : sig
   val optional : 'a enc -> 'a option enc
 end
 
+module Pp : sig
+  type 'a t = Format.formatter -> 'a -> unit
+  type 'a iter = ('a -> unit) -> unit
+  val unit : unit t
+  val int : int t
+  val int8 : char t
+  val int32 : int32 t
+  val int64 : int64 t
+  val float : float t
+  val bool : bool t
+  val string : string t
+  val data : bytes t
+  val option : 'a t -> 'a option t
+  val array : 'a t -> 'a array t
+  val iter : 'a t -> 'a iter t
+  val list : 'a t -> 'a list t
+end
+
 val of_bytes_exn : ?off:int -> 'a Decode.dec -> bytes -> 'a
 (** @raise Decode.Error if decoding fails *)
 

@@ -15,7 +15,7 @@ module CG : sig
   (** @param standalone if true, add the runtime
       library into the code to get a standalone module *)
 
-  val encode_ty_defs : t -> A.ty_def list -> unit
+  val encode_ty_defs : t -> pp:bool -> A.ty_def list -> unit
 
   val code : t -> string
   val write_code : out_channel -> t -> unit
@@ -332,7 +332,94 @@ end = struct
       (cg_ty_def_rhs_encode ~clique name) def;
     ()
 
-  let encode_ty_def_scc (self:t) (defs:A.ty_def list) : unit =
+  (* codegen for a pretty printer [<ty> Bare.Pp.printer] *)
+  let rec cg_pp_ty ~root ~clique name out (ty: A.ty_expr) : unit =
+    let recurse = cg_pp_ty ~root:false ~clique name in
+    match ty with
+    | A.Named_ty {name;_} ->
+      if List.mem name clique then (
+        (* use the recursion callback *)
+        fpf out "!_pp_%s" (String.uncapitalize_ascii name)
+      ) else (
+        fpf out "%s.pp" (String.capitalize_ascii name)
+      )
+    | A.Uint -> fpf out "Bare.Pp.int64"
+    | A.Int -> fpf out "Bare.Pp.int64"
+    | A.U8 -> fpf out "Bare.Pp.int8"
+    | A.I8 -> fpf out "Bare.Pp.int8"
+    | A.U16 -> fpf out "Bare.Pp.int"
+    | A.I16 -> fpf out "Bare.Pp.int"
+    | A.U32 -> fpf out "Bare.Pp.int32"
+    | A.I32 -> fpf out "Bare.Pp.int32"
+    | A.U64 -> fpf out "Bare.Pp.int64"
+    | A.I64 -> fpf out "Bare.Pp.int64"
+    | A.F32 -> fpf out "Bare.Pp.float"
+    | A.F64 -> fpf out "Bare.Pp.float"
+    | A.Bool -> fpf out "Bare.Pp.bool"
+    | A.String -> fpf out "Bare.Pp.string"
+    | A.Data {len=_} -> fpf out "Bare.Pp.data"
+    | A.Void -> fpf out "Bare.Pp.unit"
+    | A.Optional ty ->
+      fpf out "(@[<2>Bare.Pp.option@ %a@])" recurse ty
+    | A.Array {ty; len=_} ->
+      fpf out "(@[<2>Bare.Pp.array@ %a@])" recurse ty
+    | A.Map (String, b) ->
+      fpf out
+        "(@[<v>fun out map ->@ Bare.Pp.iter@ \
+         (@[fun out (xi,yi) ->@ \
+         @[<2>Format.fprintf out \"(%%a -> %%a)\"@ %a xi@ %a yi@]@])@ out@ \
+         (@[fun f ->@ Bare.String_map.iter (fun x y->f (x,y)) map@])@])"
+        recurse String recurse b
+    | A.Map (a, b) ->
+      fpf out
+        "(@[<v>Bare.Pp.list@ \
+         (@[fun out (xi,yi) -> Format.fprintf out \"(%%a -> %%a)\" %a xi %a yi@])@])"
+        recurse a recurse b
+    | A.Struct l ->
+      assert root; (* flattened *)
+      fpf out "(@[<v2>@[<v>fun out x ->@ begin@]@ Format.fprintf out \"{@@[ \";@ ";
+      List.iter
+        (fun (name,ty) ->
+          let field = spf "x.%s" name in
+          fpf out "@[<2>Format.fprintf out \"%s=%%a;@@ \"@ \
+                   %a@ %s@];@,"
+            name recurse ty field)
+        l;
+      fpf out "Format.fprintf out \"@@]}\";@;<1 -2>end@]@])";
+      ()
+
+  let cg_pp_def_rhs_encode ~clique name out (def: A.ty_def_rhs) : unit =
+    match def with
+    | A.Atomic ty ->
+      fpf out "%a out self" (cg_pp_ty ~clique ~root:true name) ty
+    | A.Enum cases ->
+      fpf out "@[<v>match self with@ ";
+      List.iter
+        (fun (s,_) ->
+           let c = String.capitalize_ascii s in
+           fpf out "| @[%s ->@ Format.fprintf out %S@]@," c c;
+        ) cases;
+      fpf out "@]"
+    | A.Union l ->
+      fpf out "@[<hv>match self with@ ";
+      List.iteri
+        (fun i ty ->
+           let cstor = union_elt_name ~ty_name:name i ty in
+           match ty with
+           | A.Void | A.Named_ty {is_void=true;_} ->
+             fpf out "| @[<v>%s ->@ Format.fprintf out %S@]@," cstor cstor
+           | _ ->
+             fpf out "| @[<v>%s x ->@ \
+                      Format.fprintf out \"(@@[%s@@ %%a@@])\" %a x@]@,"
+               cstor cstor (cg_pp_ty ~clique ~root:true name) ty)
+        l
+
+  (* define pretty printer for [def] *)
+  let cg_pp ~clique name out def : unit =
+    fpf out "@,@[<v2>let pp out (self:t) : unit =@ %a@]@,"
+      (cg_pp_def_rhs_encode ~clique name) def
+
+  let encode_ty_def_scc (self:t) ~pp (defs:A.ty_def list) : unit =
     match defs with
     | [{A.def=Atomic Void; name}] ->
       if !debug then Format.eprintf "skip void type %s@." name;
@@ -344,6 +431,7 @@ end = struct
       cg_ty_def_rhs_def ~lead:"type" ~self_ty:"t"
         name ~clique:[name] self.out def;
       fpf self.out "%a" (cg_ty_encode_decode ~clique:[name] name) def;
+      if pp then fpf self.out "%a" (cg_pp ~clique:[name] name) def;
       fpf self.out "@]@.end@.@.";
       ()
     | [] -> assert false
@@ -365,6 +453,7 @@ end = struct
           let self_ty = String.uncapitalize_ascii name in
           fpf self.out "let _encode_%s = ref (fun _ _ -> assert false)@," self_ty;
           fpf self.out "let _decode_%s = ref (fun _ -> assert false)@," self_ty;
+          if pp then fpf self.out "let _pp_%s = ref (fun _ _ -> assert false)@," self_ty;
         ) defs;
       (* now build one module for each type *)
       List.iter
@@ -375,21 +464,25 @@ end = struct
           let self_ty' = spf "t = %s" self_ty in
           cg_ty_def_rhs_def ~lead:"type" ~self_ty:self_ty' name ~clique self.out def;
           fpf self.out "%a" (cg_ty_encode_decode ~clique name) def;
+          if pp then fpf self.out "%a" (cg_pp ~clique name) def;
           (* fill forward references *)
           fpf self.out "@,(* fill forward declarations *)@,";
           fpf self.out "let () = _encode_%s := encode@," self_ty;
           fpf self.out "let () = _decode_%s := decode@," self_ty;
+          if pp then (
+            fpf self.out "let () = _pp_%s := pp@," self_ty;
+          );
           fpf self.out "@]@.end@.@.")
         defs;
       ()
 
-  let encode_ty_defs (self:t) (defs:A.ty_def list) : unit =
+  let encode_ty_defs (self:t) ~pp (defs:A.ty_def list) : unit =
     let defs =
       A.flatten_types defs
       |> A.replace_void_defs
       |> A.Find_scc.top
     in
-    List.iter (encode_ty_def_scc self) defs
+    List.iter (encode_ty_def_scc ~pp self) defs
 end
 
 let parse_file f : A.ty_def list =
@@ -409,10 +502,10 @@ let parse_file f : A.ty_def list =
     close_in_noerr ic;
     raise e
 
-let codegen ~standalone ~to_stdout ~out defs : unit =
+let codegen ~standalone ~to_stdout ~out ~pp defs : unit =
   let cg = CG.create() in
   CG.add_prelude ~standalone cg;
-  CG.encode_ty_defs cg defs;
+  CG.encode_ty_defs cg ~pp defs;
   if !debug then Printf.eprintf "generate code into %S\n" out;
   if out <> "" then (
     let oc = open_out out in
@@ -429,6 +522,7 @@ let () =
   let files = ref [] in
   let cat = ref false in
   let out = ref "" in
+  let pp = ref false in
   let standalone = ref false in
   let stdout = ref false in
   let opts = [
@@ -436,7 +530,8 @@ let () =
     "-d", Arg.Set debug, " debug mode";
     "-o", Arg.Set_string out, " codegen: print code to given file";
     "--standalone", Arg.Set standalone, " generate standalone code";
-    "--stdout", Arg.Set stdout, " codegen: print code to stdout"
+    "--stdout", Arg.Set stdout, " codegen: print code to stdout";
+    "--pp", Arg.Set pp, " codegen: generate pretty printer code";
   ] |> Arg.align in
   Arg.parse opts (fun f -> files := f :: !files) "usage: bare-codegen [opt]* file+";
   let tys = List.map parse_file (List.rev !files) |> List.flatten in
@@ -444,7 +539,7 @@ let () =
     List.iter (fun td -> Format.printf "%a@.@." A.pp_ty_def td) tys;
   );
   if !stdout || !out <> "" then (
-    codegen ~standalone:!standalone ~to_stdout:!stdout ~out:!out tys
+    codegen ~standalone:!standalone ~to_stdout:!stdout ~pp:!pp ~out:!out tys
   );
   ()
 

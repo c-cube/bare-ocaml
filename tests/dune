@@ -2,7 +2,7 @@
 (executable
   (name try1)
   (modules try1)
-  (libraries bare_encoding example1)
+  (libraries bare_encoding example1 example1_pp)
   (flags :standard -warn-error -a))
 
 (executable
@@ -20,6 +20,12 @@
 (library
   (name example1)
   (modules example1)
+  (libraries bare_encoding)
+  (flags :standard -warn-error -a))
+
+(library
+  (name example1_pp)
+  (modules example1_pp)
   (libraries bare_encoding)
   (flags :standard -warn-error -a))
 
@@ -44,6 +50,11 @@
   (targets example1.ml)
   (deps example1.bare)
   (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
+
+(rule
+  (targets example1_pp.ml)
+  (deps example1.bare)
+  (action (run ../src/codegen/bare_codegen.exe --pp %{deps} -o %{targets})))
 
 (rule
   (targets example2.ml)

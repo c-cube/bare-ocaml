@@ -169,6 +169,39 @@ module Encode = struct
       enc self x
 end
 
+module Pp = struct
+  type 'a t = Format.formatter -> 'a -> unit
+  type 'a iter = ('a -> unit) -> unit
+  let unit out () = Format.pp_print_string out "()"
+  let int8 out c = Format.fprintf out "%d" (Char.code c)
+  let int out x = Format.fprintf out "%d" x
+  let int32 out x = Format.fprintf out "%ld" x
+  let int64 out x = Format.fprintf out "%Ld" x
+  let float out x = Format.fprintf out "%h" x
+  let bool = Format.pp_print_bool
+  let string out x = Format.fprintf out "%S" x
+  let data out x = string out (Bytes.unsafe_to_string x)
+  let option ppelt out x = match x with
+    | None -> Format.fprintf out "None"
+    | Some x -> Format.fprintf out "(Some %a)" ppelt x
+  let array ppelt out x =
+    Format.fprintf out "[@[";
+    Array.iteri (fun i x ->
+        if i>0 then Format.fprintf out ";@ ";
+        ppelt out x)
+      x;
+    Format.fprintf out "@]]"
+  let iter ppelt out xs =
+    Format.fprintf out "[@[";
+    let i = ref 0 in
+    xs (fun x ->
+        if !i>0 then Format.fprintf out ",@ ";
+        incr i;
+        ppelt out x);
+    Format.fprintf out "@]]"
+  let list ppelt out l = iter ppelt out (fun f->List.iter f l)
+end
+
 let to_string (e:'a Encode.enc) (x:'a) =
   let buf = Buffer.create 32 in
   e buf x;
