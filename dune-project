@@ -1,6 +1,7 @@
 (lang dune 2.8)
 (generate_opam_files true)
 (name bare_encoding)
+(version 0.1)
 
 (implicit_transitive_deps false)
 
