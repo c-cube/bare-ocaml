@@ -377,7 +377,7 @@ end = struct
         recurse a recurse b
     | A.Struct l ->
       assert root; (* flattened *)
-      fpf out "(@[<v2>@[<v>fun out x ->@ begin@]@ Format.fprintf out \"{@@[ \";@ ";
+      fpf out "(@[<v2>@[<v>fun out x ->@ begin@]@ Format.fprintf out \"{ @@[\";@ ";
       List.iter
         (fun (name,ty) ->
           let field = spf "x.%s" name in

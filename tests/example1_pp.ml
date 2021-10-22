@@ -93,7 +93,7 @@ module Customer_orders_0 = struct
   let pp out (self:t) : unit =
     (fun out x ->
      begin
-       Format.fprintf out "{@[ ";
+       Format.fprintf out "{ @[";
        Format.fprintf out "orderId=%a;@ " Bare.Pp.int64 x.orderId;
        Format.fprintf out "quantity=%a;@ " Bare.Pp.int32 x.quantity;
        Format.fprintf out "@]}";
@@ -129,7 +129,7 @@ module Address = struct
   let pp out (self:t) : unit =
     (fun out x ->
      begin
-       Format.fprintf out "{@[ ";
+       Format.fprintf out "{ @[";
        Format.fprintf out "address=%a;@ " (Bare.Pp.array Bare.Pp.string)
          x.address;
        Format.fprintf out "city=%a;@ " Bare.Pp.string x.city;
@@ -186,7 +186,7 @@ module Customer = struct
   let pp out (self:t) : unit =
     (fun out x ->
      begin
-       Format.fprintf out "{@[ ";
+       Format.fprintf out "{ @[";
        Format.fprintf out "name=%a;@ " Bare.Pp.string x.name;
        Format.fprintf out "email=%a;@ " Bare.Pp.string x.email;
        Format.fprintf out "address=%a;@ " Address.pp x.address;
@@ -254,7 +254,7 @@ module Employee = struct
   let pp out (self:t) : unit =
     (fun out x ->
      begin
-       Format.fprintf out "{@[ ";
+       Format.fprintf out "{ @[";
        Format.fprintf out "name=%a;@ " Bare.Pp.string x.name;
        Format.fprintf out "email=%a;@ " Bare.Pp.string x.email;
        Format.fprintf out "address=%a;@ " Address.pp x.address;
