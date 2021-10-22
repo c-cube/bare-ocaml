@@ -2,10 +2,13 @@
 module String_map : module type of Map.Make(String)
 
 module Decode : sig
-  type t = {
-    bs: bytes;
-    mutable off: int;
-  }
+  type t
+
+  val of_buffer : Buffer.t -> t
+  val of_string : string -> t
+  val of_bytes : bytes -> t
+  val of_subbytes : bytes -> int -> int -> t
+  val set_bytes : t -> bytes -> int -> int -> unit
 
   exception Error of string
 

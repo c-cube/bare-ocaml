@@ -6,16 +6,97 @@ let spf = Printf.sprintf
 module Decode = struct
   exception Error of string
 
-  type t = {
-    bs: bytes;
-    mutable off: int;
-  }
+  module type S = sig
+    val byte : unit -> char
+    val int16_le : unit -> int
+    val int32_le : unit -> int32
+    val int64_le : unit -> int64
+    val data_bytes : int -> bytes
+    val data_blit : bytes -> int -> int -> unit
+  end
+
+  type t = (module S)
 
   type 'a dec = t -> 'a
 
   let fail_ e = raise (Error e)
   let fail_eof_ what =
     fail_ (spf "unexpected end of input, expected %s" what)
+
+  let of_subbytes b i len : t =
+    let last = i + len in
+    if i < 0 || last > Bytes.length b then fail_ "bad slice of bytes";
+    let i = ref i in
+
+    let module M = struct
+
+      let byte () =
+        if !i >= last then fail_eof_ "byte";
+        let c0 = Bytes.get b !i in
+        incr i;
+        c0
+
+      let int16_le () =
+        if !i + 1 >= last then fail_eof_ "int16";
+        let c0 = Char.code (Bytes.get b !i) in
+        let c1 = Char.code (Bytes.get b (!i + 1)) in
+        i := !i + 2;
+        c0 lor (c1 lsl 8)
+
+      let int32_le () =
+        if !i + 3 >= last then fail_eof_ "int32_le";
+        let c0 = Char.code (Bytes.get b !i) in
+        let c1 = Char.code (Bytes.get b (!i+1)) in
+        let c2 = Char.code (Bytes.get b (!i+2)) in
+        let c3 = Char.code (Bytes.get b (!i+3)) in
+        Int32.of_int (c0 lor (c1 lsl 8) lor (c2 lsl 16) lor (c3 lsl 24))
+
+      let int64_le () =
+        if !i + 7 >= last then fail_eof_ "int64_le";
+        let c0 = Char.code (Bytes.get b !i) in
+        let c1 = Char.code (Bytes.get b (!i+1)) in
+        let c2 = Char.code (Bytes.get b (!i+2)) in
+        let c3 = Char.code (Bytes.get b (!i+3)) in
+        let c4 = Char.code (Bytes.get b (!i+4)) in
+        let c5 = Char.code (Bytes.get b (!i+5)) in
+        let c6 = Char.code (Bytes.get b (!i+6)) in
+        let c7 = Char.code (Bytes.get b (!i+7)) in
+        Int64.(
+          logor
+            (of_int (c0 lor (c1 lsl 8) lor (c2 lsl 16) lor (c3 lsl 24)
+                     lor (c4 lsl 32) lor (c5 lsl 40) lor (c6 lsl 48)))
+            (shift_left (of_int c7) 56))
+
+      let data_blit buf j n =
+        if !i + n > last then fail_eof_ "data";
+        Bytes.blit b !i buf j n;
+        i := !i + n
+
+      let data_bytes n =
+        if !i + n > last then fail_eof_ "data";
+        let d = Bytes.sub b !i n in
+        i := !i + n;
+        d
+    end in
+    (module M:S)
+
+  let of_bytes b : t = of_subbytes b 0 (Bytes.length b)
+
+  let of_string s = of_bytes (Bytes.unsafe_of_string s)
+
+  let of_buffer buf : t =
+    let b = Buffer.to_bytes buf in
+    of_bytes b
+
+  (* TODO: set from buffer without copying if large enough *)
+
+  let set_bytes (self:t) b i len : unit =
+    if len<0 || i+len > Bytes.length b then (
+      fail_ (spf "Decode.set_bytes: buffer overflow")
+    );
+    self.bs <- b;
+    self.off <- i;
+    self.len <- len
 
   let uint (self:t) : int64 =
     let rec loop () =
