@@ -49,19 +49,23 @@
 (rule
   (targets example1.ml)
   (deps example1.bare)
+  (mode promote)
   (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
 
 (rule
   (targets example1_pp.ml)
   (deps example1.bare)
+  (mode promote)
   (action (run ../src/codegen/bare_codegen.exe --pp %{deps} -o %{targets})))
 
 (rule
   (targets example2.ml)
   (deps example2.bare)
+  (mode promote)
   (action (run ../src/codegen/bare_codegen.exe %{deps} -o %{targets})))
 
 (rule
   (targets example2_standalone.ml)
   (deps example2.bare)
+  (mode promote)
   (action (run ../src/codegen/bare_codegen.exe --standalone %{deps} -o %{targets})))
