@@ -140,14 +140,22 @@ module Pp : sig
 end
 
 val of_bytes_exn : ?off:int -> 'a Decode.dec -> bytes -> 'a
-(** @raise Decode.Error if decoding fails *)
+(** [of_bytes_exn dec bs] uses [dec] to decode a value of type ['a]
+    from bytes stored in [bs].
+    @param off the initial offset in [bs] (default 0)
+    @raise Decode.Error if decoding fails *)
 
 val of_bytes : ?off:int -> 'a Decode.dec -> bytes -> ('a, string) result
+(** Same as {!of_bytes_exn} but doesn't raise. *)
 
 val of_string_exn : 'a Decode.dec -> string -> 'a
-(** @raise Decode.Error if decoding fails *)
+(** Decode a value stored in the string.
+    See {of_bytes_exn} for more details.
+    @raise Decode.Error if decoding fails *)
 
 val of_string : 'a Decode.dec -> string -> ('a, string) result
+(** Safe version of {!of_string_exn} *)
 
 val to_string : 'a Encode.enc -> 'a -> string
+(** Encode a value of type ['a] into a string using the given encoder. *)
 
