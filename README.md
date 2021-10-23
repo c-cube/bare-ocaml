@@ -4,8 +4,8 @@
 A simple code generator and runtime library for [BARE](https://baremessages.org/)
 following [the spec](https://datatracker.ietf.org/doc/draft-devault-bare).
 
-License: MIT.
-
+- License: MIT.
+- online documentation: https://c-cube.github.io/bare-ocaml/
 
 ## Features
 
