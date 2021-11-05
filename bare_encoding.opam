@@ -28,3 +28,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
+dev-repo: "git+https://github.com/c-cube/bare-ocaml.git"
