@@ -1,3 +1,4 @@
+(* generated from "example1.bare" using bare-codegen *)
 [@@@ocaml.warning "-26-27"]
 module Bare = Bare_encoding
 module PublicKey = struct

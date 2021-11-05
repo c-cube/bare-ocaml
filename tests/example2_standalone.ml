@@ -1,3 +1,4 @@
+(* generated from "example2.bare" using bare-codegen *)
 [@@@ocaml.warning "-26-27"]
 
 (* embedded runtime library *)

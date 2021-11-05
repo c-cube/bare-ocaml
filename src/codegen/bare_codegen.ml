@@ -11,7 +11,7 @@ module CG : sig
   type t
   val create : unit -> t
 
-  val add_prelude : standalone:bool -> t -> unit
+  val add_prelude : filenames:string list -> standalone:bool -> t -> unit
   (** @param standalone if true, add the runtime
       library into the code to get a standalone module *)
 
@@ -34,8 +34,10 @@ end = struct
     let out = Format.formatter_of_buffer buf in
     {out; buf}
 
-  let add_prelude ~standalone self =
-    fpf self.out "[@@@@@@ocaml.warning \"-26-27\"]@.";
+  let add_prelude ~filenames ~standalone self =
+    fpf self.out "(* generated from %s using bare-codegen *)@.\
+                  [@@@@@@ocaml.warning \"-26-27\"]@."
+      (String.concat "," @@ List.map (Printf.sprintf "%S") filenames);
     if standalone then (
       fpf self.out "@.(* embedded runtime library *)@.\
                     @[<v>@[<2>module Bare = struct@ %s@]@ end@]\
@@ -502,9 +504,9 @@ let parse_file f : A.ty_def list =
     close_in_noerr ic;
     raise e
 
-let codegen ~standalone ~to_stdout ~out ~pp defs : unit =
+let codegen ~standalone ~to_stdout ~out ~pp ~files defs : unit =
   let cg = CG.create() in
-  CG.add_prelude ~standalone cg;
+  CG.add_prelude ~filenames:files ~standalone cg;
   CG.encode_ty_defs cg ~pp defs;
   if !debug then Printf.eprintf "generate code into %S\n" out;
   if out <> "" then (
@@ -534,12 +536,16 @@ let () =
     "--pp", Arg.Set pp, " codegen: generate pretty printer code";
   ] |> Arg.align in
   Arg.parse opts (fun f -> files := f :: !files) "usage: bare-codegen [opt]* file+";
-  let tys = List.map parse_file (List.rev !files) |> List.flatten in
+  let files = List.rev !files in
+  let tys = List.map parse_file files |> List.flatten in
   if !cat then (
     List.iter (fun td -> Format.printf "%a@.@." A.pp_ty_def td) tys;
   );
   if !stdout || !out <> "" then (
-    codegen ~standalone:!standalone ~to_stdout:!stdout ~pp:!pp ~out:!out tys
+    codegen
+      ~standalone:!standalone ~to_stdout:!stdout ~pp:!pp ~out:!out
+      ~files
+      tys
   );
   ()
 
