@@ -34,3 +34,16 @@ type PTree2Node {
   i: int
   right: PTree2
 }
+
+type AllInts {
+  i1: u8
+  i2: i8
+  i3: u16
+  i4: i16
+  i5: u32
+  i6: i32
+  i7: u64
+  i8_: i64
+  i9: uint
+  i10: int
+}

@@ -518,4 +518,48 @@ module PTree2Node = struct
   
 end
 
+module AllInts = struct
+  type t = {
+    i1: char;
+    i2: char;
+    i3: int;
+    i4: int;
+    i5: int32;
+    i6: int32;
+    i7: int64;
+    i8_: int64;
+    i9: int64;
+    i10: int64;
+  }
+  
+  (** @raise Bare.Decode.Error in case of error. *)
+  let decode (dec: Bare.Decode.t) : t =
+    let i1 = Bare.Decode.i8 dec in
+    let i2 = Bare.Decode.u8 dec in
+    let i3 = Bare.Decode.u16 dec in
+    let i4 = Bare.Decode.i16 dec in
+    let i5 = Bare.Decode.u32 dec in
+    let i6 = Bare.Decode.i32 dec in
+    let i7 = Bare.Decode.u64 dec in
+    let i8_ = Bare.Decode.i64 dec in
+    let i9 = Bare.Decode.uint dec in
+    let i10 = Bare.Decode.int dec in
+    {i1; i2; i3; i4; i5; i6; i7; i8_; i9; i10; }
+  
+  let encode (enc: Bare.Encode.t) (self: t) : unit =
+    begin
+      Bare.Encode.i8 enc self.i1;
+      Bare.Encode.u8 enc self.i2;
+      Bare.Encode.u16 enc self.i3;
+      Bare.Encode.i16 enc self.i4;
+      Bare.Encode.u32 enc self.i5;
+      Bare.Encode.i32 enc self.i6;
+      Bare.Encode.u64 enc self.i7;
+      Bare.Encode.i64 enc self.i8_;
+      Bare.Encode.uint enc self.i9;
+      Bare.Encode.int enc self.i10;
+    end
+  
+end
+
 
