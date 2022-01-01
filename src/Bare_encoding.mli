@@ -5,18 +5,56 @@
 
 module String_map : module type of Map.Make(String)
 
+(** {2 Input type}
+
+    An input is a source of bytes, used to decode. *)
+module type INPUT = sig
+  val read_byte : unit -> char
+  (** Read a single byte.
+      @raise Invalid_argument if input is exhausted *)
+
+  val read_i16 : unit -> int
+  (** Read 2 bytes, in little endian.
+      @raise Invalid_argument if input is exhausted *)
+
+  val read_i32 : unit -> int32
+  (** Read 4 bytes, in little endian.
+      @raise Invalid_argument if input is exhausted *)
+
+  val read_i64 : unit -> int64
+  (** Read 8 bytes, in little endian.
+      @raise Invalid_argument if input is exhausted *)
+
+  val read_exact : bytes -> int -> int -> unit
+  (** [read_exact buf i len] reads [len] bytes into [buf], starting at offset [i]
+      @raise Invalid_argument if input has less than [len] bytes *)
+end
+
+type input = (module INPUT)
+
 (** Decoders.
 
     This module provides a decoder type {!Decode.t} to hold the decoding state,
     along with functions to decode specific primitives. *)
 module Decode : sig
-  type t = {
-    bs: bytes;
-    mutable off: int;
-  }
-  (** A decoder state, operating on a slice of bytes. *)
+  type t
 
-  exception Error of string
+  val of_input : input -> t
+  (** [create input] makes a decoder for the given input.
+      @since 0.2 *)
+
+  val of_string : ?off:int -> ?len:int -> string -> t
+  (** Decoder reading from the string.
+      @param off initial offset in the string
+      @param len length of the slice of the string
+      @raises Invalid_arg if [off,off+len] is not a valid slice in the string.
+      @since 0.2
+  *)
+
+  val of_bytes : ?off:int -> ?len:int -> bytes -> t
+  (** See {!of_string}
+      @since 0.2
+  *)
 
   type 'a dec = t -> 'a
   (** A decoder for values of type ['a].
@@ -48,6 +86,33 @@ module Decode : sig
   val optional : 'a dec -> 'a option dec
 end
 
+(** Output
+
+    An output is a sink where one can write bytes to encode data to BARE. *)
+module type OUTPUT = sig
+  val write_byte : char -> unit
+  (** Write a single byte. *)
+
+  val write_i16 : int -> unit
+  (** Write 2 bytes, in little endian. *)
+
+  val write_i32 : int32 -> unit
+  (** Write 4 bytes, in little endian. *)
+
+  val write_i64 : int64 -> unit
+  (** Write 8 bytes, in little endian. *)
+
+  val write_exact : bytes -> int -> int -> unit
+  (** [write_exact b i len] writes the slice of length [len]
+      of [b] starting at [i]. *)
+
+  val flush : unit -> unit
+  (** Non specified hint that the data may be flushed onto the disk
+      or network. Doing nothing is acceptable when this makes no sense
+      (e.g. when writing to a {!Buffer.t}). *)
+end
+
+type output = (module OUTPUT)
 
 (** Encoder type and some encoding utils.
 
@@ -58,6 +123,10 @@ end
 module Encode : sig
   type t
   (** Encoding state. *)
+
+  val of_output : output -> t
+  (** Encoding state that writes into the given output.
+      @since 0.2 *)
 
   val of_buffer : Buffer.t -> t
   (** Encoding state that emits bytes into the given buffer.
@@ -139,21 +208,21 @@ module Pp : sig
   val list : 'a t -> 'a list t
 end
 
-val of_bytes_exn : ?off:int -> 'a Decode.dec -> bytes -> 'a
+val of_bytes_exn : ?off:int -> ?len:int -> 'a Decode.dec -> bytes -> 'a
 (** [of_bytes_exn dec bs] uses [dec] to decode a value of type ['a]
     from bytes stored in [bs].
     @param off the initial offset in [bs] (default 0)
     @raise Decode.Error if decoding fails *)
 
-val of_bytes : ?off:int -> 'a Decode.dec -> bytes -> ('a, string) result
+val of_bytes : ?off:int -> ?len:int -> 'a Decode.dec -> bytes -> ('a, string) result
 (** Same as {!of_bytes_exn} but doesn't raise. *)
 
-val of_string_exn : 'a Decode.dec -> string -> 'a
+val of_string_exn : ?off:int -> ?len:int -> 'a Decode.dec -> string -> 'a
 (** Decode a value stored in the string.
     See {of_bytes_exn} for more details.
     @raise Decode.Error if decoding fails *)
 
-val of_string : 'a Decode.dec -> string -> ('a, string) result
+val of_string : ?off:int -> ?len:int -> 'a Decode.dec -> string -> ('a, string) result
 (** Safe version of {!of_string_exn} *)
 
 val to_string : 'a Encode.enc -> 'a -> string

@@ -124,8 +124,8 @@ end = struct
             n := i + 1;
         )
         l;
-      fpf self "| @[x -> raise (Bare.Decode.Error@ \
-                (Printf.sprintf \"unknown enum member for %s.t: %%Ld\" x))@]@]@,"
+      fpf self "| @[x -> invalid_arg@ \
+                (Printf.sprintf \"unknown enum member for %s.t: %%Ld\" x)@]@]@,"
         (String.capitalize_ascii _name);
     end;
     ()
@@ -193,19 +193,19 @@ end = struct
     | A.Array {ty; len=None} ->
       fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
                 if len>Int64.of_int Sys.max_array_length then \
-                  raise (Bare.Decode.Error\"array too big\");@ \
+                  invalid_arg \"array too big\";@ \
                 @[<2>Array.init (Int64.to_int len)@ (@[fun _ -> %a@])@]@])" recurse ty
     | A.Map (String, b) ->
       fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
                 if len>Int64.of_int max_int then \
-                 raise (Bare.Decode.Error \"array too big\");@ \
+                 invalid_arg \"array too big\";@ \
                  @[<2>List.init (Int64.to_int len)@ (@[<v>fun _ ->@ \
                 let k = Bare.Decode.string dec in@ let v = %a in@ k,v@])@]@ \
                 |> List.to_seq |> Bare.String_map.of_seq@])" recurse b
     | A.Map (a, b) ->
       fpf self "(@[<v>let len = Bare.Decode.uint dec in@ \
                 if len>Int64.of_int Sys.max_array_length \
-                then raise (Bare.Decode.Error \"array too big\");@ \
+                then invalid_arg \"array too big\";@ \
                  @[<2>List.init (Int64.to_int len)@ (@[fun _ ->@ \
                 let k = %a in@ let v = %a@ in k,v@])@]@])" recurse a recurse b
     | A.Struct l ->
@@ -237,8 +237,8 @@ end = struct
              fpf self "| @[%dL ->@ %s (%a)@]@ " i
                cstor (cg_ty_decode ~clique ~root:false ~ty_name) ty)
         l;
-      fpf self "| @[_ -> raise (Bare.Decode.Error\
-                (Printf.sprintf \"unknown union tag %s.t: %%Ld\" tag))@]@," ty_name
+      fpf self "| @[_ -> invalid_arg@ \
+                (Printf.sprintf \"unknown union tag %s.t: %%Ld\" tag)@]@," ty_name
 
   (* codegen for encoding [x] into [enc] *)
   let rec cg_ty_encode (x:string) ~clique ~root ~ty_name (self:fmt) (ty:A.ty_expr) : unit =
@@ -327,7 +327,7 @@ end = struct
       | A.Enum l -> cg_enum_conv self name l
       | _ -> ()
     end;
-    fpf self "@,(** @raise Bare.Decode.Error in case of error. *)@,\
+    fpf self "@,(** @raise Invalid_argument in case of error. *)@,\
               @[<v2>let decode (dec: Bare.Decode.t) : t =@ %a@]@,"
       (cg_ty_def_rhs_decode ~clique name) def;
     fpf self "@,@[<v2>let encode (enc: Bare.Encode.t) (self: t) : unit =@ %a@]@,"

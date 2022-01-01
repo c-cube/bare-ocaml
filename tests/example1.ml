@@ -4,7 +4,7 @@ module Bare = Bare_encoding
 module PublicKey = struct
   type t = bytes
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     Bare.Decode.data_of ~size:128 dec
   
@@ -16,7 +16,7 @@ end
 module Time = struct
   type t = string
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     Bare.Decode.string dec
   
@@ -46,10 +46,10 @@ module Department = struct
     | 2L -> CUSTOMER_SERVICE
     | 3L -> DEVELOPMENT
     | 99L -> JSMITH
-    | x -> raise (Bare.Decode.Error
-      (Printf.sprintf "unknown enum member for Department.t: %Ld" x))
+    | x -> invalid_arg
+      (Printf.sprintf "unknown enum member for Department.t: %Ld" x)
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     of_int (Bare.Decode.uint dec)
   
@@ -64,7 +64,7 @@ module Customer_orders_0 = struct
     quantity: int32;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let orderId = Bare.Decode.i64 dec in
     let quantity = Bare.Decode.i32 dec in
@@ -86,7 +86,7 @@ module Address = struct
     country: string;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let address = Array.init 4 (fun _ -> Bare.Decode.string dec) in
     let city = Bare.Decode.string dec in
@@ -114,18 +114,18 @@ module Customer = struct
     metadata: bytes Bare.String_map.t;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let name = Bare.Decode.string dec in
     let email = Bare.Decode.string dec in
     let address = Address.decode dec in
     let orders =
       (let len = Bare.Decode.uint dec in
-       if len>Int64.of_int Sys.max_array_length then raise (Bare.Decode.Error"array too big");
+       if len>Int64.of_int Sys.max_array_length then invalid_arg "array too big";
        Array.init (Int64.to_int len) (fun _ -> Customer_orders_0.decode dec)) in
     let metadata =
       (let len = Bare.Decode.uint dec in
-       if len>Int64.of_int max_int then raise (Bare.Decode.Error "array too big");
+       if len>Int64.of_int max_int then invalid_arg "array too big";
        List.init (Int64.to_int len)
          (fun _ ->
           let k = Bare.Decode.string dec in
@@ -161,7 +161,7 @@ module Employee = struct
     metadata: bytes Bare.String_map.t;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let name = Bare.Decode.string dec in
     let email = Bare.Decode.string dec in
@@ -172,7 +172,7 @@ module Employee = struct
       Bare.Decode.optional (fun dec -> PublicKey.decode dec) dec in
     let metadata =
       (let len = Bare.Decode.uint dec in
-       if len>Int64.of_int max_int then raise (Bare.Decode.Error "array too big");
+       if len>Int64.of_int max_int then invalid_arg "array too big";
        List.init (Int64.to_int len)
          (fun _ ->
           let k = Bare.Decode.string dec in
@@ -204,13 +204,13 @@ module Person = struct
     | Employee of Employee.t
     
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let tag = Bare.Decode.uint dec in
     match tag with
     | 0L -> Customer (Customer.decode dec)
     | 1L -> Employee (Employee.decode dec)
-    | _ -> raise (Bare.Decode.Error(Printf.sprintf "unknown union tag Person.t: %Ld" tag))
+    | _ -> invalid_arg (Printf.sprintf "unknown union tag Person.t: %Ld" tag)
     
   
   let encode (enc: Bare.Encode.t) (self: t) : unit =

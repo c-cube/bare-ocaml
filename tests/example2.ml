@@ -7,7 +7,7 @@ module Person = struct
     last: string;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let first = Bare.Decode.string dec in
     let last = Bare.Decode.string dec in
@@ -41,7 +41,7 @@ module PTreeNode = struct
     right: pTree;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let left = !_decode_pTree dec in
     let person = Person.decode dec in
@@ -67,13 +67,13 @@ module PTree = struct
     | PTreeNode of pTreeNode
     
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let tag = Bare.Decode.uint dec in
     match tag with
     | 0L -> PTreeNil
     | 1L -> PTreeNode (!_decode_pTreeNode dec)
-    | _ -> raise (Bare.Decode.Error(Printf.sprintf "unknown union tag PTree.t: %Ld" tag))
+    | _ -> invalid_arg (Printf.sprintf "unknown union tag PTree.t: %Ld" tag)
     
   
   let encode (enc: Bare.Encode.t) (self: t) : unit =
@@ -109,7 +109,7 @@ module Rec1 = struct
     r2: rec2 option;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let a1 = Bare.Decode.string dec in
     let r2 = Bare.Decode.optional (fun dec -> !_decode_rec2 dec) dec in
@@ -134,7 +134,7 @@ module Rec2 = struct
     r1: rec1 option;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let a2 = Bare.Decode.i16 dec in
     let r1 = Bare.Decode.optional (fun dec -> !_decode_rec1 dec) dec in
@@ -172,13 +172,13 @@ module PTree2 = struct
     | PTree2Node of pTree2Node
     
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let tag = Bare.Decode.uint dec in
     match tag with
     | 0L -> PTree2_0
     | 1L -> PTree2Node (!_decode_pTree2Node dec)
-    | _ -> raise (Bare.Decode.Error(Printf.sprintf "unknown union tag PTree2.t: %Ld" tag))
+    | _ -> invalid_arg (Printf.sprintf "unknown union tag PTree2.t: %Ld" tag)
     
   
   let encode (enc: Bare.Encode.t) (self: t) : unit =
@@ -203,7 +203,7 @@ module PTree2Node = struct
     right: pTree2;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let left = !_decode_pTree2 dec in
     let i = Bare.Decode.int dec in
@@ -237,7 +237,7 @@ module AllInts = struct
     i10: int64;
   }
   
-  (** @raise Bare.Decode.Error in case of error. *)
+  (** @raise Invalid_argument in case of error. *)
   let decode (dec: Bare.Decode.t) : t =
     let i1 = Bare.Decode.i8 dec in
     let i2 = Bare.Decode.u8 dec in
