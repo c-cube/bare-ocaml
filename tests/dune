@@ -34,6 +34,13 @@
   (modules example2_standalone)
   (flags :standard -warn-error -a))
 
+(executable
+  (name bench1)
+  (modules bench1)
+  (libraries unix bare_encoding example1 example1_pp)
+  (ocamlopt_flags :standard -O3)
+  (flags :standard -warn-error -a))
+
 (rule
   (alias runtest)
   (action (run ./try1.exe)))
