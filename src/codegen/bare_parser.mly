@@ -1,5 +1,4 @@
 %{
-  let pos lexbuf = lexbuf.Lexing.lex_curr_p
   open Ast
   open Ast.P
 %}
