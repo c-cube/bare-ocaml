@@ -1,7 +1,7 @@
 (lang dune 2.8)
 (generate_opam_files true)
 (name bare_encoding)
-(version 0.1.1)
+(version 0.2)
 (source (github "c-cube/bare-ocaml"))
 
 (implicit_transitive_deps false)
