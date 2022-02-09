@@ -484,7 +484,7 @@ module Rec2 = struct
 end
 
 type pTree2 =
-  | PTree2_0
+  | Void
   | PTree2Node of pTree2Node
   
 and pTree2Node = {
@@ -498,7 +498,7 @@ let _encode_pTree2Node = ref (fun _ _ -> assert false)
 let _decode_pTree2Node = ref (fun _ -> assert false)
 module PTree2 = struct
   type t = pTree2 =
-    | PTree2_0
+    | Void
     | PTree2Node of pTree2Node
     
   
@@ -506,14 +506,14 @@ module PTree2 = struct
   let decode (dec: Bare.Decode.t) : t =
     let tag = Bare.Decode.uint dec in
     match tag with
-    | 0L -> PTree2_0
+    | 0L -> Void
     | 1L -> PTree2Node (!_decode_pTree2Node dec)
     | _ -> invalid_arg (Printf.sprintf "unknown union tag PTree2.t: %Ld" tag)
     
   
   let encode (enc: Bare.Encode.t) (self: t) : unit =
     match self with
-    | PTree2_0 ->
+    | Void ->
       Bare.Encode.uint enc 0L
     | PTree2Node x ->
       Bare.Encode.uint enc 1L;

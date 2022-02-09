@@ -90,6 +90,23 @@ end = struct
   let union_elt_name ~ty_name i (ty:A.ty_expr) : string =
     match ty with
     | Named_ty {name;_} -> String.capitalize_ascii name
+    | Data {len=None} -> "Data"
+    | Data {len=Some n} -> spf "Data_%d" n
+    | Int -> "Int"
+    | Uint -> "Uint"
+    | Bool -> "Bool"
+    | String -> "String"
+    | I8 -> "Int8"
+    | I16 -> "Int16"
+    | I32 -> "Int32"
+    | I64 -> "Int64"
+    | U8 -> "UInt8"
+    | U16 -> "UInt16"
+    | U32 -> "UInt32"
+    | U64 -> "UInt64"
+    | F32 -> "Float32"
+    | F64 -> "Float64"
+    | Void -> "Void"
     | _ -> spf "%s_%d" (String.capitalize_ascii ty_name) i
 
   (* for [enum name l], produce int64<->t conversions *)
