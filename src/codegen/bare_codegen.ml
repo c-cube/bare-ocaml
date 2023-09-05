@@ -404,7 +404,7 @@ end = struct
                    %a@ %s@];@,"
             name recurse ty field)
         l;
-      fpf out "Format.fprintf out \"@@]}\";@;<1 -2>end@]@])";
+      fpf out "Format.fprintf out \"@@]}\";@;<1 -2>end@])";
       ()
 
   let cg_pp_def_rhs_encode ~clique name out (def: A.ty_def_rhs) : unit =
