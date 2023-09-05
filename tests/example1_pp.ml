@@ -99,7 +99,7 @@ module Customer_orders_0 = struct
        Format.fprintf out "quantity=%a;@ " Bare.Pp.int32 x.quantity;
        Format.fprintf out "@]}";
      end) out self
-
+  
 end
 
 module Address = struct
@@ -138,7 +138,7 @@ module Address = struct
        Format.fprintf out "country=%a;@ " Bare.Pp.string x.country;
        Format.fprintf out "@]}";
      end) out self
-
+  
 end
 
 module Customer = struct
@@ -203,7 +203,7 @@ module Customer = struct
          x.metadata;
        Format.fprintf out "@]}";
      end) out self
-
+  
 end
 
 module Employee = struct
@@ -273,7 +273,7 @@ module Employee = struct
          x.metadata;
        Format.fprintf out "@]}";
      end) out self
-
+  
 end
 
 module Person = struct

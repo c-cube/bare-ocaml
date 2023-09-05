@@ -17,6 +17,12 @@
   (libraries bare_encoding)
   (flags :standard -warn-error -a))
 
+(executable
+  (name try3)
+  (modules try3 example3)
+  (libraries bare_encoding)
+  (flags :standard -warn-error -a))
+
 (library
   (name example1)
   (modules example1)
@@ -54,6 +60,10 @@
   (action (run ./try_ex2.exe)))
 
 (rule
+  (alias runtest)
+  (action (run ./try3.exe)))
+
+(rule
   (targets example1.ml)
   (deps example1.bare)
   (mode promote)
@@ -76,3 +86,10 @@
   (deps example2.bare)
   (mode promote)
   (action (run ../src/codegen/bare_codegen.exe --standalone %{deps} -o %{targets})))
+
+(rule
+  (targets example3.ml)
+  (deps example3.bare)
+  (mode promote)
+  (action (run ../src/codegen/bare_codegen.exe --pp %{deps} -o %{targets})))
+

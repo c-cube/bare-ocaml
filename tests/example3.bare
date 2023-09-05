@@ -1,0 +1,7 @@
+
+type Arg_value (i64 | string | bool | f64 | void | []Arg)
+
+type Arg {
+  key: string
+  value: Arg_value
+}
