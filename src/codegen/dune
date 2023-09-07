@@ -7,7 +7,7 @@
 
 (rule
   (targets embeded_lib.ml)
-  (deps ../Bare_encoding.ml)
+  (deps ../bare_encoding.ml)
   (action (with-stdout-to %{targets} (run ./tool/embed.exe %{deps}))))
 
 (ocamllex (modules bare_lexer))

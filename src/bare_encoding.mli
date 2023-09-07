@@ -1,11 +1,10 @@
-
 (** BARE runtime library.
 
     See {{: https://baremessages.org/} the spec}. *)
 
-module String_map : module type of Map.Make(String)
+module String_map : module type of Map.Make (String)
 
-(** {2 Input type}
+(** Input type.
 
     An input is a source of bytes, used to decode. *)
 module type INPUT = sig
@@ -75,14 +74,11 @@ module Decode : sig
   val i32 : t -> int32
   val i64 : t -> int64
   val bool : t -> bool
-
   val f32 : t -> float
   val f64 : t -> float
-
   val string : t -> string
   val data : t -> bytes
   val data_of : size:int -> t -> bytes
-
   val optional : 'a dec -> 'a option dec
 end
 
@@ -193,6 +189,7 @@ module Pp : sig
   (** A pretty printer for values of type ['a] *)
 
   type 'a iter = ('a -> unit) -> unit
+
   val unit : unit t
   val int : int t
   val int8 : char t
@@ -214,7 +211,8 @@ val of_bytes_exn : ?off:int -> ?len:int -> 'a Decode.dec -> bytes -> 'a
     @param off the initial offset in [bs] (default 0)
     @raise Decode.Error if decoding fails *)
 
-val of_bytes : ?off:int -> ?len:int -> 'a Decode.dec -> bytes -> ('a, string) result
+val of_bytes :
+  ?off:int -> ?len:int -> 'a Decode.dec -> bytes -> ('a, string) result
 (** Same as {!of_bytes_exn} but doesn't raise. *)
 
 val of_string_exn : ?off:int -> ?len:int -> 'a Decode.dec -> string -> 'a
@@ -222,9 +220,9 @@ val of_string_exn : ?off:int -> ?len:int -> 'a Decode.dec -> string -> 'a
     See {of_bytes_exn} for more details.
     @raise Decode.Error if decoding fails *)
 
-val of_string : ?off:int -> ?len:int -> 'a Decode.dec -> string -> ('a, string) result
+val of_string :
+  ?off:int -> ?len:int -> 'a Decode.dec -> string -> ('a, string) result
 (** Safe version of {!of_string_exn} *)
 
 val to_string : 'a Encode.enc -> 'a -> string
 (** Encode a value of type ['a] into a string using the given encoder. *)
-
