@@ -1,0 +1,5 @@
+
+(test
+  (name t)
+  (package bare_encoding)
+  (libraries bare_encoding qcheck-core qcheck-core.runner))

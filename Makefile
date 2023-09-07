@@ -8,5 +8,6 @@ test:
 clean:
 	@dune clean
 
+WATCH?="@install @runtest"
 watch:
-	@dune build @all -w
+	@dune build @all -w $(WATCH)

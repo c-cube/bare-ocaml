@@ -17,4 +17,4 @@
   (bug_reports "https://github.com/c-cube/bare-ocaml/issues")
   (depends
     (ocaml (>= "4.08"))
-    (qtest (and :with-test (>= "2.10")))))
+    (qcheck-core (and :with-test (>= 0.20)))))
