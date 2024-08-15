@@ -1,41 +1,41 @@
 
 # tests around mutually recursive types
 
-type Person {
-  first: string
-  last: string
+type Person struct {
+  first: str
+  last: str
 }
 
 type PTreeNil void
 
-type PTreeNode {
+type PTreeNode struct {
   left: PTree
   person: Person
   right: PTree
 }
 
-type PTree (PTreeNil | PTreeNode)
+type PTree union { PTreeNil | PTreeNode }
 
 
-type Rec1 {
-  a1: string
+type Rec1 struct {
+  a1: str
   r2: optional<Rec2>
 }
 
-type Rec2 {
+type Rec2 struct {
   a2: i16
   r1: optional<Rec1>
 }
 
-type PTree2 (void | PTree2Node)
+type PTree2 union { void | PTree2Node }
 
-type PTree2Node {
+type PTree2Node struct {
   left: PTree2
   i: int
   right: PTree2
 }
 
-type AllInts {
+type AllInts struct {
   i1: u8
   i2: i8
   i3: u16

@@ -5,6 +5,12 @@ build:
 test:
 	@dune runtest --force --no-buffer
 
+test-autopromote:
+	@dune runtest --force --no-buffer --auto-promote
+
+bench:
+	@dune exec --profile=release tests/bench1.exe
+
 clean:
 	@dune clean
 

@@ -2,25 +2,37 @@
 (executable
   (name try1)
   (modules try1)
-  (libraries bare_encoding example1 example1_pp)
+  (libraries bare_encoding example1 example1_pp hex)
   (flags :standard -warn-error -a))
 
-(executable
+(test
   (name try2)
   (modules try2)
-  (libraries bare_encoding example1)
+  (libraries bare_encoding example1 hex)
   (flags :standard -warn-error -a))
 
-(executable
+(test
   (name try_ex2)
   (modules example2 try_ex2)
-  (libraries bare_encoding)
+  (libraries bare_encoding hex) 
+  (flags :standard -warn-error -a))
+
+(test
+  (name example2_standalone)
+  (modules example2_standalone)
   (flags :standard -warn-error -a))
 
 (executable
   (name try3)
   (modules try3 example3)
-  (libraries bare_encoding)
+  (libraries bare_encoding hex)
+  (flags :standard -warn-error -a))
+
+(executable
+  (name bench1)
+  (modules bench1)
+  (libraries unix bare_encoding example1 example1_pp hex)
+  (ocamlopt_flags :standard -O3)
   (flags :standard -warn-error -a))
 
 (library
@@ -34,34 +46,6 @@
   (modules example1_pp)
   (libraries bare_encoding)
   (flags :standard -warn-error -a))
-
-(library
-  (name example2_sa)
-  (modules example2_standalone)
-  (flags :standard -warn-error -a))
-
-(executable
-  (name bench1)
-  (modules bench1)
-  (libraries unix bare_encoding example1 example1_pp)
-  (ocamlopt_flags :standard -O3)
-  (flags :standard -warn-error -a))
-
-(rule
-  (alias runtest)
-  (action (run ./try1.exe)))
-
-(rule
-  (alias runtest)
-  (action (run ./try2.exe)))
-
-(rule
-  (alias runtest)
-  (action (run ./try_ex2.exe)))
-
-(rule
-  (alias runtest)
-  (action (run ./try3.exe)))
 
 (rule
   (targets example1.ml)

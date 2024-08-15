@@ -1,7 +1,7 @@
 
-type Arg_value (i64 | string | bool | f64 | void | []Arg)
+type Arg_value union { i64 | str | bool | f64 | void | list<Arg> }
 
-type Arg {
-  key: string
+type Arg struct {
+  key: str
   value: Arg_value
 }

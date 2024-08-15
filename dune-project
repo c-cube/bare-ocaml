@@ -17,4 +17,5 @@
   (bug_reports "https://github.com/c-cube/bare-ocaml/issues")
   (depends
     (ocaml (>= "4.08"))
+    (hex (and :with-test (>= 1.5)))
     (qcheck-core (and :with-test (>= 0.20)))))

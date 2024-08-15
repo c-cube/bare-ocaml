@@ -11,6 +11,7 @@ bug-reports: "https://github.com/c-cube/bare-ocaml/issues"
 depends: [
   "dune" {>= "2.8"}
   "ocaml" {>= "4.08"}
+  "hex" {with-test & >= "1.5"}
   "qcheck-core" {with-test & >= "0.20"}
   "odoc" {with-doc}
 ]

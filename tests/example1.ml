@@ -58,6 +58,27 @@ module Department = struct
   
 end
 
+module Address = struct
+  type t = string array array
+  
+  (** @raise Invalid_argument in case of error. *)
+  let decode (dec: Bare.Decode.t) : t =
+    Array.init 4
+      (fun _ ->
+       (let len = Bare.Decode.uint dec in
+        if len>Int64.of_int Sys.max_array_length then invalid_arg "array too big";
+        Array.init (Int64.to_int len) (fun _ -> Bare.Decode.string dec)))
+  
+  let encode (enc: Bare.Encode.t) (self: t) : unit =
+    (assert (Array.length self = 4);
+       Array.iter (fun xi ->
+                   (let arr = xi in
+                    Bare.Encode.uint enc (Int64.of_int (Array.length arr));
+                    Array.iter (fun xi -> Bare.Encode.string enc xi) arr))
+       self)
+  
+end
+
 module Customer_orders_0 = struct
   type t = {
     orderId: int64;
@@ -74,33 +95,6 @@ module Customer_orders_0 = struct
     begin
       Bare.Encode.i64 enc self.orderId;
       Bare.Encode.i32 enc self.quantity;
-    end
-  
-end
-
-module Address = struct
-  type t = {
-    address: string array;
-    city: string;
-    state: string;
-    country: string;
-  }
-  
-  (** @raise Invalid_argument in case of error. *)
-  let decode (dec: Bare.Decode.t) : t =
-    let address = Array.init 4 (fun _ -> Bare.Decode.string dec) in
-    let city = Bare.Decode.string dec in
-    let state = Bare.Decode.string dec in
-    let country = Bare.Decode.string dec in
-    {address; city; state; country; }
-  
-  let encode (enc: Bare.Encode.t) (self: t) : unit =
-    begin
-      (assert (Array.length self.address = 4);
-         Array.iter (fun xi -> Bare.Encode.string enc xi) self.address);
-      Bare.Encode.string enc self.city;
-      Bare.Encode.string enc self.state;
-      Bare.Encode.string enc self.country;
     end
   
 end
@@ -202,6 +196,7 @@ module Person = struct
   type t =
     | Customer of Customer.t
     | Employee of Employee.t
+    | TerminatedEmployee
     
   
   (** @raise Invalid_argument in case of error. *)
@@ -210,6 +205,7 @@ module Person = struct
     match tag with
     | 0L -> Customer (Customer.decode dec)
     | 1L -> Employee (Employee.decode dec)
+    | 2L -> TerminatedEmployee
     | _ -> invalid_arg (Printf.sprintf "unknown union tag Person.t: %Ld" tag)
     
   
@@ -221,6 +217,8 @@ module Person = struct
     | Employee x ->
       Bare.Encode.uint enc 1L;
       Employee.encode enc x
+    | TerminatedEmployee ->
+      Bare.Encode.uint enc 2L
     
     
 end
