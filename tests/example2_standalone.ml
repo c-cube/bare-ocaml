@@ -71,16 +71,14 @@ module Decode = struct
   type t = D : 'a input * 'a -> t
 
   let[@inline] of_input (i : _ input) x : t = D (i, x)
-
-  let of_bytes ?off ?len b : t =
-    of_input input_of_bslice @@ bslice_of_bytes ?off ?len b
-
+  let of_bslice b : t = of_input input_of_bslice b
+  let of_bytes ?off ?len b : t = of_bslice @@ bslice_of_bytes ?off ?len b
   let of_string ?off ?len s = of_bytes ?off ?len (Bytes.unsafe_of_string s)
 
   type 'a dec = t -> 'a
 
   let uint (D (i, x)) : int64 =
-    let rec loop () =
+    let[@unroll 2] rec loop () =
       let c = i.read_byte x in
       let c = Char.code c in
       if c land 0b1000_0000 <> 0 then (
@@ -151,33 +149,30 @@ module Decode = struct
       Some (dec self)
 end
 
-module type OUTPUT = sig
-  val write_byte : char -> unit
-  val write_i16 : int -> unit
-  val write_i32 : int32 -> unit
-  val write_i64 : int64 -> unit
-  val write_exact : bytes -> int -> int -> unit
-  val flush : unit -> unit
-end
+type 'a output = {
+  write_byte: 'a -> char -> unit;
+  write_i16: 'a -> int -> unit;
+  write_i32: 'a -> int32 -> unit;
+  write_i64: 'a -> int64 -> unit;
+  write_exact: 'a -> bytes -> int -> int -> unit;
+  flush: 'a -> unit;
+}
 
-type output = (module OUTPUT)
-
-let output_of_buffer (buf : Buffer.t) : output =
-  let module M = struct
-    let[@inline] write_byte c = Buffer.add_char buf c
-    let[@inline] write_i16 c = Buffer.add_int16_le buf c
-    let[@inline] write_i32 c = Buffer.add_int32_le buf c
-    let[@inline] write_i64 c = Buffer.add_int64_le buf c
-    let write_exact b i len = Buffer.add_subbytes buf b i len
-    let flush _ = ()
-  end in
-  (module M)
+let output_of_buffer : Buffer.t output =
+  {
+    write_byte = Buffer.add_char;
+    write_i16 = Buffer.add_int16_le;
+    write_i32 = Buffer.add_int32_le;
+    write_i64 = Buffer.add_int64_le;
+    write_exact = Buffer.add_subbytes;
+    flush = ignore;
+  }
 
 module Encode = struct
-  type t = output
+  type t = E : 'a output * 'a -> t
 
-  let[@inline] of_output (o : output) : t = o
-  let[@inline] of_buffer buf : t = of_output @@ output_of_buffer buf
+  let[@inline] of_output (o : _ output) x : t = E (o, x)
+  let[@inline] of_buffer buf : t = of_output output_of_buffer buf
 
   type 'a enc = t -> 'a -> unit
 
@@ -186,6 +181,7 @@ module Encode = struct
 
   let uint (self : t) (i : int64) : unit =
     let module I = Int64 in
+    let (E (o, st)) = self in
     let i = ref i in
     let continue = ref true in
     while !continue do
@@ -193,14 +189,12 @@ module Encode = struct
       if !i = j then (
         continue := false;
         let j = I.to_int j in
-        let (module M) = self in
-        M.write_byte (unsafe_chr j)
+        o.write_byte st (unsafe_chr j)
       ) else (
         (* set bit 8 to [1] *)
         let lsb = I.to_int (I.logor 0b1000_0000L j) in
         let lsb = unsafe_chr lsb in
-        let (module M) = self in
-        M.write_byte lsb;
+        o.write_byte st lsb;
         i := I.shift_right_logical !i 7
       )
     done
@@ -211,26 +205,26 @@ module Encode = struct
     uint self ui
 
   let[@inline] i8 (self : t) x =
-    let (module M) = self in
-    M.write_byte x
+    let (E (o, st)) = self in
+    o.write_byte st x
 
   let u8 = i8
 
   let[@inline] i16 (self : t) x =
-    let (module M) = self in
-    M.write_i16 x
+    let (E (o, st)) = self in
+    o.write_i16 st x
 
   let u16 = i16
 
   let[@inline] i32 (self : t) x =
-    let (module M) = self in
-    M.write_i32 x
+    let (E (o, st)) = self in
+    o.write_i32 st x
 
   let u32 = i32
 
   let[@inline] i64 (self : t) x =
-    let (module M) = self in
-    M.write_i64 x
+    let (E (o, st)) = self in
+    o.write_i64 st x
 
   let u64 = i64
 
@@ -245,13 +239,13 @@ module Encode = struct
 
   let data_of ~size (self : t) x =
     if size <> Bytes.length x then failwith "invalid length for Encode.data_of";
-    let (module M) = self in
-    M.write_exact x 0 size
+    let (E (o, st)) = self in
+    o.write_exact st x 0 size
 
   let data (self : t) x =
     uint self (Int64.of_int (Bytes.length x));
-    let (module M) = self in
-    M.write_exact x 0 (Bytes.length x)
+    let (E (o, st)) = self in
+    o.write_exact st x 0 (Bytes.length x)
 
   let[@inline] string self x = data self (Bytes.unsafe_of_string x)
 

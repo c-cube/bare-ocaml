@@ -4,32 +4,32 @@
 
 module String_map : module type of Map.Make (String)
 
+type bslice = {
+  bs: bytes;
+  mutable off: int;
+  mutable len: int;
+}
+
+type 'a input = {
+  read_byte: 'a -> char;
+      (** Read a single byte.
+      @raise Invalid_argument if input is exhausted *)
+  read_i16: 'a -> int;
+      (** Read 2 bytes, in little endian.
+      @raise Invalid_argument if input is exhausted *)
+  read_i32: 'a -> int32;
+      (** Read 4 bytes, in little endian.
+      @raise Invalid_argument if input is exhausted *)
+  read_i64: 'a -> int64;
+      (** Read 8 bytes, in little endian.
+      @raise Invalid_argument if input is exhausted *)
+  read_exact: 'a -> bytes -> int -> int -> unit;
+      (** [read_exact buf i len] reads [len] bytes into [buf], starting at offset [i]
+      @raise Invalid_argument if input has less than [len] bytes *)
+}
 (** Input type.
 
     An input is a source of bytes, used to decode. *)
-module type INPUT = sig
-  val read_byte : unit -> char
-  (** Read a single byte.
-      @raise Invalid_argument if input is exhausted *)
-
-  val read_i16 : unit -> int
-  (** Read 2 bytes, in little endian.
-      @raise Invalid_argument if input is exhausted *)
-
-  val read_i32 : unit -> int32
-  (** Read 4 bytes, in little endian.
-      @raise Invalid_argument if input is exhausted *)
-
-  val read_i64 : unit -> int64
-  (** Read 8 bytes, in little endian.
-      @raise Invalid_argument if input is exhausted *)
-
-  val read_exact : bytes -> int -> int -> unit
-  (** [read_exact buf i len] reads [len] bytes into [buf], starting at offset [i]
-      @raise Invalid_argument if input has less than [len] bytes *)
-end
-
-type input = (module INPUT)
 
 (** Decoders.
 
@@ -38,7 +38,7 @@ type input = (module INPUT)
 module Decode : sig
   type t
 
-  val of_input : input -> t
+  val of_input : 'a input -> 'a -> t
   (** [create input] makes a decoder for the given input.
       @since 0.2 *)
 
@@ -54,6 +54,10 @@ module Decode : sig
   (** See {!of_string}
       @since 0.2
   *)
+
+  val of_bslice : bslice -> t
+  (** Decode from a slice (mutates it)
+      @since NEXT_RELEASE *)
 
   type 'a dec = t -> 'a
   (** A decoder for values of type ['a].
@@ -82,33 +86,22 @@ module Decode : sig
   val optional : 'a dec -> 'a option dec
 end
 
+type 'a output = {
+  write_byte: 'a -> char -> unit;  (** Write a single byte. *)
+  write_i16: 'a -> int -> unit;  (** Write 2 bytes, in little endian. *)
+  write_i32: 'a -> int32 -> unit;  (** Write 4 bytes, in little endian. *)
+  write_i64: 'a -> int64 -> unit;  (** Write 8 bytes, in little endian. *)
+  write_exact: 'a -> bytes -> int -> int -> unit;
+      (** [write_exact b i len] writes the slice of length [len]
+      of [b] starting at [i]. *)
+  flush: 'a -> unit;
+      (** Non specified hint that the data may be flushed onto the disk
+      or network. Doing nothing is acceptable when this makes no sense
+      (e.g. when writing to a {!Buffer.t}). *)
+}
 (** Output
 
     An output is a sink where one can write bytes to encode data to BARE. *)
-module type OUTPUT = sig
-  val write_byte : char -> unit
-  (** Write a single byte. *)
-
-  val write_i16 : int -> unit
-  (** Write 2 bytes, in little endian. *)
-
-  val write_i32 : int32 -> unit
-  (** Write 4 bytes, in little endian. *)
-
-  val write_i64 : int64 -> unit
-  (** Write 8 bytes, in little endian. *)
-
-  val write_exact : bytes -> int -> int -> unit
-  (** [write_exact b i len] writes the slice of length [len]
-      of [b] starting at [i]. *)
-
-  val flush : unit -> unit
-  (** Non specified hint that the data may be flushed onto the disk
-      or network. Doing nothing is acceptable when this makes no sense
-      (e.g. when writing to a {!Buffer.t}). *)
-end
-
-type output = (module OUTPUT)
 
 (** Encoder type and some encoding utils.
 
@@ -120,7 +113,7 @@ module Encode : sig
   type t
   (** Encoding state. *)
 
-  val of_output : output -> t
+  val of_output : 'i output -> 'i -> t
   (** Encoding state that writes into the given output.
       @since 0.2 *)
 
