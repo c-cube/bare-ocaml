@@ -9,7 +9,7 @@ test-autopromote:
 	@dune runtest --force --no-buffer --auto-promote
 
 bench:
-	@dune exec --profile=release tests/bench1.exe
+	./bench1.sh
 
 clean:
 	@dune clean

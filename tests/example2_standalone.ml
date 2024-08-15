@@ -5,74 +5,83 @@
 module Bare = struct
   module String_map = Map.Make (String)
 
-module type INPUT = sig
-  val read_byte : unit -> char
-  val read_i16 : unit -> int
-  val read_i32 : unit -> int32
-  val read_i64 : unit -> int64
-  val read_exact : bytes -> int -> int -> unit
+type 'a input = {
+  read_byte: 'a -> char;
+  read_i16: 'a -> int;
+  read_i32: 'a -> int32;
+  read_i64: 'a -> int64;
+  read_exact: 'a -> bytes -> int -> int -> unit;
+}
+
+type bslice = {
+  bs: bytes;
+  mutable off: int;
+  mutable len: int;
+}
+
+module Input_of_bslice_ = struct
+  type t = bslice
+
+  let[@inline] consume_ (self : t) n : int =
+    if self.len < n then invalid_arg "input exhausted";
+    let off = self.off in
+    self.off <- self.off + n;
+    self.len <- self.len - n;
+    off
+
+  let[@inline] read_byte self =
+    let off = consume_ self 1 in
+    let c = Bytes.get self.bs off in
+    c
+
+  let[@inline] read_i16 (self : t) =
+    let off = consume_ self 2 in
+    let r = Bytes.get_int16_le self.bs off in
+    r
+
+  let[@inline] read_i32 (self : t) =
+    let off = consume_ self 4 in
+    let r = Bytes.get_int32_le self.bs off in
+    r
+
+  let read_i64 (self : t) =
+    let off = consume_ self 8 in
+    let r = Bytes.get_int64_le self.bs off in
+    r
+
+  let read_exact self into i len =
+    let off = consume_ self len in
+    Bytes.blit self.bs off into i len
 end
 
-type input = (module INPUT)
+let input_of_bslice : bslice input =
+  let open Input_of_bslice_ in
+  { read_byte; read_i64; read_i16; read_i32; read_exact }
 
-let input_of_bytes ?(off = 0) ?len (b : bytes) : input =
-  let off = ref off in
+let bslice_of_bytes ?(off = 0) ?len (b : bytes) : bslice =
   let len =
     match len with
-    | None -> Bytes.length b - !off
+    | None -> Bytes.length b - off
     | Some l -> l
   in
-  if !off + len > Bytes.length b then invalid_arg "input_of_bytes";
-  let[@inline] check_ n =
-    if !off + n > len then invalid_arg "input exhausted"
-  in
-  let module M = struct
-    let read_byte () =
-      check_ 1;
-      let c = Bytes.get b !off in
-      incr off;
-      c
-
-    let read_i16 () =
-      check_ 2;
-      let r = Bytes.get_int16_le b !off in
-      off := !off + 2;
-      r
-
-    let read_i32 () =
-      check_ 4;
-      let r = Bytes.get_int32_le b !off in
-      off := !off + 4;
-      r
-
-    let read_i64 () =
-      check_ 8;
-      let r = Bytes.get_int64_le b !off in
-      off := !off + 8;
-      r
-
-    let read_exact into i len =
-      check_ len;
-      Bytes.blit b !off into i len;
-      off := !off + len
-  end in
-  (module M)
+  if off + len > Bytes.length b then invalid_arg "input_of_bytes";
+  { bs = b; off; len }
 
 module Decode = struct
-  type t = input
+  type t = D : 'a input * 'a -> t
 
-  let[@inline] of_input (i : input) : t = i
-  let of_bytes ?off ?len b = of_input (input_of_bytes ?off ?len b)
+  let[@inline] of_input (i : _ input) x : t = D (i, x)
+
+  let of_bytes ?off ?len b : t =
+    of_input input_of_bslice @@ bslice_of_bytes ?off ?len b
+
   let of_string ?off ?len s = of_bytes ?off ?len (Bytes.unsafe_of_string s)
 
   type 'a dec = t -> 'a
 
-  let uint (self : t) : int64 =
+  let uint (D (i, x)) : int64 =
     let rec loop () =
-      let c =
-        let (module M) = self in
-        M.read_byte ()
-      in
+      let c = i.read_byte x in
       let c = Char.code c in
       if c land 0b1000_0000 <> 0 then (
         let rest = loop () in
@@ -98,28 +107,13 @@ module Decode = struct
     in
     res
 
-  let i8 (self : t) : char =
-    let (module M) = self in
-    M.read_byte ()
-
+  let[@inline] i8 (D (i, x)) : char = i.read_byte x
   let u8 = i8
-
-  let i16 (self : t) =
-    let (module M) = self in
-    M.read_i16 ()
-
+  let[@inline] i16 (D (i, x)) = i.read_i16 x
   let u16 = i16
-
-  let i32 (self : t) =
-    let (module M) = self in
-    M.read_i32 ()
-
+  let[@inline] i32 (D (i, x)) = i.read_i32 x
   let u32 = i32
-
-  let i64 (self : t) =
-    let (module M) = self in
-    M.read_i64 ()
-
+  let[@inline] i64 (D (i, x)) = i.read_i64 x
   let u64 = i64
 
   let[@inline] bool self : bool =
@@ -134,10 +128,9 @@ module Decode = struct
     let i = i64 self in
     Int64.float_of_bits i
 
-  let data_of ~size (self : t) : bytes =
+  let data_of ~size (D (i, x)) : bytes =
     let b = Bytes.create size in
-    let (module M) = self in
-    M.read_exact b 0 size;
+    i.read_exact x b 0 size;
     b
 
   let data self : bytes =
@@ -244,9 +237,9 @@ module Encode = struct
   let bool self x =
     i8 self
       (if x then
-        Char.chr 1
-      else
-        Char.chr 0)
+         Char.chr 1
+       else
+         Char.chr 0)
 
   let f64 (self : t) x = i64 self (Int64.bits_of_float x)
 
@@ -329,7 +322,6 @@ let of_string_exn ?off ?len dec s =
 
 let of_string ?off ?len dec s =
   of_bytes ?off ?len dec (Bytes.unsafe_of_string s)
-
 
 end
 

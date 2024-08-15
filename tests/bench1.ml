@@ -2,11 +2,23 @@ module E = Example1
 module Bare = Bare_encoding
 
 let now = Unix.gettimeofday
-let n = try Sys.getenv "N" |> int_of_string with _ -> 1_000_000
-let coeff = try Sys.getenv "COEFF" |> int_of_string with _ -> 10
 (* objects per string *)
 
 let () =
+  let n = ref 1_000_000 in
+  let batch = ref 8 in
+  let repeat = ref 5 in
+
+  let opts =
+    Arg.align
+      [
+        "-n", Arg.Set_int n, " number of iterations";
+        "--batch", Arg.Set_int batch, " batch size";
+        "--repeat", Arg.Set_int repeat, " repeat size";
+      ]
+  in
+  Arg.parse opts ignore "";
+
   let p1 =
     E.Person.Customer
       {
@@ -25,42 +37,45 @@ let () =
       }
   in
 
-  let encoded_p1 = Bare.to_string E.Person.encode p1 in
-  let len = String.length encoded_p1 in
+  let persons = Array.make !batch p1 in
+  let encoded_l = Bare.to_string E.Persons.encode persons in
+  let len = String.length encoded_l in
   Printf.printf
-    "do %d iterations, %d objects each (each object is %d bytes)\n%!" n coeff
-    len;
+    "do %d iterations with %d persons each, %d repetitions each (each list of \
+     persons is %d bytes)\n\
+     %!"
+    !n !batch !repeat len;
 
   (let t1 = now () in
    let buf = Buffer.create (len * 2) in
-   for _i = 1 to n do
+   for _i = 1 to !n do
      Buffer.clear buf;
      let out = Bare.Encode.of_buffer buf in
-     for _j = 1 to coeff do
-       E.Person.encode out p1
+     for _j = 1 to !repeat do
+       E.Persons.encode out persons
      done
    done;
 
    let dur = now () -. t1 in
-   let written = float (n * coeff * len) in
+   let written = float (!n * !repeat * len) in
    Printf.printf "written %.3f GB in %.2fs (%.3fGB/s)\n%!" (written *. 1e-9) dur
      (written *. 1e-9 /. dur));
 
-  (let str = String.concat "" (Array.make coeff encoded_p1 |> Array.to_list) in
+  (let str = String.concat "" (Array.make !repeat encoded_l |> Array.to_list) in
 
    let t1 = now () in
 
-   for _i = 1 to n do
+   for _i = 1 to !n do
      let dec = Bare.Decode.of_string str in
 
-     for _j = 1 to coeff do
-       let _p = E.Person.decode dec in
+     for _j = 1 to !repeat do
+       let _p = E.Persons.decode dec in
        ()
      done
    done;
 
    let dur = now () -. t1 in
-   let read = float (n * len) in
+   let read = float (!n * !repeat * len) in
    Printf.printf "read %.3f GB in %.2fs (%.3fGB/s)\n%!" (read *. 1e-9) dur
      (read *. 1e-9 /. dur));
 

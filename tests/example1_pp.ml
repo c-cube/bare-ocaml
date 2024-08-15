@@ -302,4 +302,23 @@ module Person = struct
       
 end
 
+module Persons = struct
+  type t = Person.t array
+  
+  (** @raise Invalid_argument in case of error. *)
+  let decode (dec: Bare.Decode.t) : t =
+    (let len = Bare.Decode.uint dec in
+     if len>Int64.of_int Sys.max_array_length then invalid_arg "array too big";
+     Array.init (Int64.to_int len) (fun _ -> Person.decode dec))
+  
+  let encode (enc: Bare.Encode.t) (self: t) : unit =
+    (let arr = self in
+     Bare.Encode.uint enc (Int64.of_int (Array.length arr));
+     Array.iter (fun xi -> Person.encode enc xi) arr)
+  
+  let pp out (self:t) : unit =
+    (Bare.Pp.array Person.pp) out self
+  
+end
+
 

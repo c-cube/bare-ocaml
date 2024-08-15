@@ -37,3 +37,5 @@ type Employee struct {
 type TerminatedEmployee void
 
 type Person union {Customer | Employee | TerminatedEmployee}
+
+type Persons list<Person>
