@@ -1,8 +1,19 @@
 module E = Example1
 module Bare = Bare_encoding
 
+let spf = Printf.sprintf
 let now = Unix.gettimeofday
-(* objects per string *)
+
+let pp_byte_size words =
+  let b = words *. 8. in
+  if b >= 1e9 then
+    spf "%.2fGB" (b /. 1e9)
+  else if b >= 1e6 then
+    spf "%.2fMB" (b /. 1e6)
+  else if b >= 1e3 then
+    spf "%.2fkB" (b /. 1e3)
+  else
+    spf "%.2fB" b
 
 let () =
   let n = ref 1_000_000 in
@@ -48,6 +59,8 @@ let () =
 
   (let t1 = now () in
    let buf = Buffer.create (len * 2) in
+
+   let gc1 = Gc.minor_words () in
    for _i = 1 to !n do
      Buffer.clear buf;
      let out = Bare.Encode.of_buffer buf in
@@ -55,15 +68,22 @@ let () =
        E.Persons.encode out persons
      done
    done;
+   let gc2 = Gc.minor_words () in
 
+   let alloc_kb = (gc2 -. gc1) /. 1024. in
    let dur = now () -. t1 in
    let written = float (!n * !repeat * len) in
-   Printf.printf "written %.3f GB in %.2fs (%.3fGB/s)\n%!" (written *. 1e-9) dur
-     (written *. 1e-9 /. dur));
+   Printf.printf
+     "written %.3f GB in %.2fs (%.3fGB/s), minor alloc=%s (%s/s)\n%!"
+     (written *. 1e-9) dur
+     (written *. 1e-9 /. dur)
+     (pp_byte_size alloc_kb)
+     (pp_byte_size (alloc_kb /. dur)));
 
   (let str = String.concat "" (Array.make !repeat encoded_l |> Array.to_list) in
 
    let t1 = now () in
+   let gc1 = Gc.minor_words () in
 
    for _i = 1 to !n do
      let dec = Bare.Decode.of_string str in
@@ -73,10 +93,15 @@ let () =
        ()
      done
    done;
+   let gc2 = Gc.minor_words () in
 
+   let alloc_kb = (gc2 -. gc1) /. 1024. in
    let dur = now () -. t1 in
    let read = float (!n * !repeat * len) in
-   Printf.printf "read %.3f GB in %.2fs (%.3fGB/s)\n%!" (read *. 1e-9) dur
-     (read *. 1e-9 /. dur));
+   Printf.printf "read %.3f GB in %.2fs (%.3fGB/s), minor alloc=%s (%s/s)\n%!"
+     (read *. 1e-9) dur
+     (read *. 1e-9 /. dur)
+     (pp_byte_size alloc_kb)
+     (pp_byte_size (alloc_kb /. dur)));
 
   ()
