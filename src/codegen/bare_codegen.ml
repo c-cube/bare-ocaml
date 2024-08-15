@@ -56,9 +56,10 @@ end = struct
     Buffer.output_buffer oc self.buf
 
   (* codegen type definition.
+     root: is [ty] directly at the top of a definition
      clique: other types in the same mutually-recursive clique as [ty] *)
-  let rec cg_ty_ty ~clique (self : fmt) (ty : A.ty_expr) : unit =
-    let recurse = cg_ty_ty ~clique in
+  let rec cg_ty_ty ~root ~clique (self : fmt) (ty : A.ty_expr) : unit =
+    let recurse = cg_ty_ty ~root:false ~clique in
     match ty with
     | A.Named_ty { name; _ } ->
       if List.mem name clique then
@@ -79,6 +80,16 @@ end = struct
     | A.Array { ty; len = _ } -> fpf self "@[%a@ array@]" recurse ty
     | A.Map (String, b) -> fpf self "@[%a@ Bare.String_map.t@]" recurse b
     | A.Map (a, b) -> fpf self "@[(@[%a *@ %a@]) list@]" recurse a recurse b
+    | A.Struct l ->
+      assert root;
+      (* flattened *)
+      fpf self "{@,";
+      List.iteri
+        (fun i (name, ty) ->
+          if i > 0 then fpf self "@ ";
+          fpf self "%s: %a;" name recurse ty)
+        l;
+      fpf self "@;<0 -2>}"
 
   (* named for the i-th element of an union *)
   let union_elt_name ~ty_name i (ty : A.ty_expr) : string =
@@ -141,7 +152,9 @@ end = struct
       : unit =
     match tyd with
     | A.Atomic ty ->
-      fpf self "@[<v2>%s %s = %a@]@," lead self_ty (cg_ty_ty ~clique) ty
+      fpf self "@[<v2>%s %s = %a@]@," lead self_ty
+        (cg_ty_ty ~clique ~root:true)
+        ty
     | A.Enum l ->
       fpf self "@[<hv2>%s %s =@ " lead self_ty;
       List.iteri
@@ -157,22 +170,15 @@ end = struct
           let name = union_elt_name ~ty_name i ty in
           match ty with
           | Named_ty { is_void = true; _ } | Void -> fpf self "| %s@ " name
-          | _ -> fpf self "| @[%s of %a@]@ " name (cg_ty_ty ~clique) ty)
+          | _ ->
+            fpf self "| @[%s of %a@]@ " name (cg_ty_ty ~clique ~root:false) ty)
         l;
       fpf self "@]@,"
-    | A.Struct l ->
-      (* flattened *)
-      fpf self "{@,";
-      List.iteri
-        (fun i (name, ty) ->
-          if i > 0 then fpf self "@ ";
-          fpf self "%s: %a;" name (cg_ty_ty ~clique) ty)
-        l;
-      fpf self "@;<0 -2>}"
 
   (* codegen for decoding *)
-  let rec cg_ty_decode ~clique ~ty_name (self : fmt) (ty : A.ty_expr) : unit =
-    let recurse = cg_ty_decode ~clique ~ty_name in
+  let rec cg_ty_decode ~root ~clique ~ty_name (self : fmt) (ty : A.ty_expr) :
+      unit =
+    let recurse = cg_ty_decode ~clique ~root:false ~ty_name in
     match ty with
     | A.Named_ty { name; is_void = true } ->
       (* refer to the constructor instead *)
@@ -226,12 +232,22 @@ end = struct
          @[<2>List.init (Int64.to_int len)@ (@[fun _ ->@ let k = %a in@ let v \
          = %a@ in k,v@])@]@])"
         recurse a recurse b
+    | A.Struct l ->
+      assert root;
+      (* flattened *)
+      fpf self "@[<hv>";
+      List.iter
+        (fun (n, ty) -> fpf self "@[<2>let %s =@ %a in@]@ " n recurse ty)
+        l;
+      fpf self "{@[<hv>";
+      List.iter (fun (n, _) -> fpf self "%s;@ " n) l;
+      fpf self "@]}@]"
 
   (* codegen for decoding *)
   let cg_ty_def_rhs_decode ~clique ty_name (self : fmt) (def : A.ty_def_rhs) :
       unit =
     match def with
-    | A.Atomic ty -> cg_ty_decode ~clique ~ty_name self ty
+    | A.Atomic ty -> cg_ty_decode ~clique ~root:true ~ty_name self ty
     | A.Enum _ -> fpf self "of_int (Bare.Decode.uint dec)"
     | A.Union l ->
       fpf self "let tag = Bare.Decode.uint dec in@ match tag with@ ";
@@ -244,30 +260,18 @@ end = struct
             fpf self "| @[%dL ->@ %s@]@ " i cstor
           | _ ->
             fpf self "| @[%dL ->@ %s (%a)@]@ " i cstor
-              (cg_ty_decode ~clique ~ty_name)
+              (cg_ty_decode ~clique ~root:false ~ty_name)
               ty)
         l;
       fpf self
         "| @[_ -> invalid_arg@ (Printf.sprintf \"unknown union tag %s.t: \
          %%Ld\" tag)@]@,"
         ty_name
-    | A.Struct l ->
-      (* flattened *)
-      fpf self "@[<hv>";
-      List.iter
-        (fun (n, ty) ->
-          fpf self "@[<2>let %s =@ %a in@]@ " n
-            (cg_ty_decode ~clique ~ty_name)
-            ty)
-        l;
-      fpf self "{@[<hv>";
-      List.iter (fun (n, _) -> fpf self "%s;@ " n) l;
-      fpf self "@]}@]"
 
   (* codegen for encoding [x] into [enc] *)
-  let rec cg_ty_encode (x : string) ~clique ~ty_name (self : fmt)
+  let rec cg_ty_encode (x : string) ~clique ~root ~ty_name (self : fmt)
       (ty : A.ty_expr) : unit =
-    let recurse x = cg_ty_encode ~clique ~ty_name x in
+    let recurse x = cg_ty_encode ~clique ~root:false ~ty_name x in
     match ty with
     | A.Named_ty { name; _ } ->
       if List.mem name clique then
@@ -320,12 +324,24 @@ end = struct
         "(@[<v>Bare.Encode.uint enc (Int64.of_int (List.length %s));\n\
         \                @[<2>List.iter@ (@[fun (x,y) ->@ %a;@ %a@])@ %s@]@])" x
         (recurse "x") a (recurse "y") b x
+    | A.Struct l ->
+      assert root;
+      (* flattened *)
+      fpf self "@[<hv2>begin@ ";
+      List.iteri
+        (fun i (n, ty) ->
+          if i > 0 then fpf self "@ ";
+          let field = spf "%s.%s" x n in
+          fpf self "%a;" (recurse field) ty)
+        l;
+      fpf self "@;<1 -2>end@]";
+      ()
 
   (* codegen for encoding *)
   let cg_ty_def_rhs_encode ty_name ~clique (self : fmt) (def : A.ty_def_rhs) :
       unit =
     match def with
-    | A.Atomic ty -> cg_ty_encode "self" ~clique ~ty_name self ty
+    | A.Atomic ty -> cg_ty_encode "self" ~clique ~root:true ~ty_name self ty
     | A.Enum _ -> fpf self "Bare.Encode.uint enc (to_int self)"
     | A.Union l ->
       fpf self "@[<hv>match self with@ ";
@@ -337,20 +353,9 @@ end = struct
             fpf self "| @[<v>%s ->@ Bare.Encode.uint enc %dL@]@," cstor i
           | _ ->
             fpf self "| @[<v>%s x ->@ Bare.Encode.uint enc %dL;@ %a@]@," cstor i
-              (cg_ty_encode ~clique ~ty_name "x")
+              (cg_ty_encode ~clique ~root:false ~ty_name "x")
               ty)
         l
-    | A.Struct l ->
-      (* flattened *)
-      fpf self "@[<hv2>begin@ ";
-      List.iteri
-        (fun i (n, ty) ->
-          if i > 0 then fpf self "@ ";
-          let field = spf "self.%s" n in
-          fpf self "%a;" (cg_ty_encode ~clique ~ty_name field) ty)
-        l;
-      fpf self "@;<1 -2>end@]";
-      ()
 
   (* define encoding/decoding/annex functions for [def] *)
   let cg_ty_encode_decode ~clique name self def : unit =
@@ -370,8 +375,8 @@ end = struct
     ()
 
   (* codegen for a pretty printer [<ty> Bare.Pp.printer] *)
-  let rec cg_pp_ty ~clique name out (ty : A.ty_expr) : unit =
-    let recurse = cg_pp_ty ~clique name in
+  let rec cg_pp_ty ~root ~clique name out (ty : A.ty_expr) : unit =
+    let recurse = cg_pp_ty ~root:false ~clique name in
     match ty with
     | A.Named_ty { name; _ } ->
       if List.mem name clique then
@@ -408,10 +413,23 @@ end = struct
         "(@[<v>Bare.Pp.list@ (@[fun out (xi,yi) -> Format.fprintf out \"(%%a \
          -> %%a)\" %a xi %a yi@])@])"
         recurse a recurse b
+    | A.Struct l ->
+      assert root;
+      (* flattened *)
+      fpf out
+        "(@[<v2>@[<v>fun out x ->@ begin@]@ Format.fprintf out \"{ @@[\";@ ";
+      List.iter
+        (fun (name, ty) ->
+          let field = spf "x.%s" name in
+          fpf out "@[<2>Format.fprintf out \"%s=%%a;@@ \"@ %a@ %s@];@," name
+            recurse ty field)
+        l;
+      fpf out "Format.fprintf out \"@@]}\";@;<1 -2>end@])";
+      ()
 
   let cg_pp_def_rhs_encode ~clique name out (def : A.ty_def_rhs) : unit =
     match def with
-    | A.Atomic ty -> fpf out "%a out self" (cg_pp_ty ~clique name) ty
+    | A.Atomic ty -> fpf out "%a out self" (cg_pp_ty ~clique ~root:true name) ty
     | A.Enum cases ->
       fpf out "@[<v>match self with@ ";
       List.iter
@@ -431,20 +449,10 @@ end = struct
           | _ ->
             fpf out
               "| @[<v>%s x ->@ Format.fprintf out \"(@@[%s@@ %%a@@])\" %a x@]@,"
-              cstor cstor (cg_pp_ty ~clique name) ty)
+              cstor cstor
+              (cg_pp_ty ~clique ~root:true name)
+              ty)
         l
-    | A.Struct l ->
-      (* flattened *)
-      fpf out
-        "(@[<v2>@[<v>fun out x ->@ begin@]@ Format.fprintf out \"{ @@[\";@ ";
-      List.iter
-        (fun (f_name, ty) ->
-          let field = spf "x.%s" f_name in
-          fpf out "@[<2>Format.fprintf out \"%s=%%a;@@ \"@ %a@ %s@];@," name
-            (cg_pp_ty ~clique name) ty field)
-        l;
-      fpf out "Format.fprintf out \"@@]}\";@;<1 -2>end@])";
-      ()
 
   (* define pretty printer for [def] *)
   let cg_pp ~clique name out def : unit =
@@ -518,7 +526,7 @@ end = struct
       ()
 
   let encode_ty_defs (self : t) ~pp (defs : A.ty_def list) : unit =
-    let defs = defs |> A.replace_void_defs |> A.Find_scc.top in
+    let defs = A.flatten_types defs |> A.replace_void_defs |> A.Find_scc.top in
     List.iter (encode_ty_def_scc ~pp self) defs
 end
 

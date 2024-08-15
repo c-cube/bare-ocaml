@@ -33,6 +33,9 @@ rule token = parse
   | '=' { EQUAL }
   | "type" { TYPE }
   | "data" { DATA }
+  | "struct" { STRUCT }
+  | "union" { UNION }
+  | "list" { LIST }
   | "enum" { ENUM }
   | "map" { MAP }
   | "optional" { OPTIONAL }

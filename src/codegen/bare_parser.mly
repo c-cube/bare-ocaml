@@ -20,7 +20,10 @@
 %token EQUAL
 %token PIPE
 
+%token STRUCT
+%token UNION
 %token ENUM
+%token LIST
 %token OPTIONAL
 %token MAP
 %token DATA
@@ -48,30 +51,28 @@ top_defs:
 
 ty:
   | DATA { Data {len=None} }
-  | DATA LEFT_ANGLE INT RIGHT_ANGLE { Data {len=Some (int_of_string $3)}  }
+  | DATA LEFT_BRACKET INT RIGHT_BRACKET { Data {len=Some (int_of_string $3)}  }
   | IDENT {
     try List.assoc $1 ty_expr_l
     with Not_found -> Ast.Named_ty {name=$1; is_void=false}
   }
   | OPTIONAL LEFT_ANGLE ty RIGHT_ANGLE { Optional $3 }
-  | LEFT_BRACKET RIGHT_BRACKET ty { Array {ty=$3; len=None} }
-  | LEFT_BRACKET INT RIGHT_BRACKET ty { Array {ty=$4; len=Some (int_of_string $2)} }
-  | MAP LEFT_BRACKET ty RIGHT_BRACKET ty { Map ($3, $5) }
-  | LEFT_BRACE struct_fields RIGHT_BRACE {
-    Struct $2
-  }
+  | LIST LEFT_ANGLE ty RIGHT_ANGLE { Array {ty=$3; len=None} }
+  | ty LEFT_BRACKET INT RIGHT_BRACKET { Array {ty=$1; len=Some (int_of_string $3)} }
+  | MAP LEFT_ANGLE ty RIGHT_ANGLE LEFT_ANGLE ty RIGHT_ANGLE { Map ($3, $6) }
+  | STRUCT LEFT_BRACE struct_fields RIGHT_BRACE { Struct $3 }
 
 ty_def:
-  | TYPE IDENT LEFT_PAREN union_items RIGHT_PAREN {
-    {Ast. name=$2; def=Union $4}
+  | TYPE IDENT UNION LEFT_BRACE union_items RIGHT_BRACE {
+    {Ast. name=$2; def=Union $5}
   }
   | TYPE IDENT ty {
 (*     let loc = Ast.loc_of_lexbuf lexbuf in *)
     {Ast. name=$2; def=Atomic $3}
   }
-  | ENUM IDENT LEFT_BRACE enum_items RIGHT_BRACE {
+  | TYPE IDENT ENUM LEFT_BRACE enum_items RIGHT_BRACE {
 (*     let loc = Ast.loc_of_lexbuf lexbuf in *)
-    {Ast. name=$2; def=Enum $4}
+    {Ast. name=$2; def=Enum $5}
   }
 
 struct_fields:

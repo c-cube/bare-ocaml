@@ -36,12 +36,12 @@ type ty_expr =
       len: int option;
     }
   | Map of ty_expr * ty_expr
+  | Struct of (string * ty_expr) list
 
 type ty_def_rhs =
   | Atomic of ty_expr
   | Enum of (string * int option) list
   | Union of ty_expr list
-  | Struct of (string * ty_expr) list
 
 type ty_def = {
   name: string;
@@ -56,6 +56,7 @@ let iter_ty f (ty : ty_expr) : unit =
     | Map (a, b) ->
       aux a;
       aux b
+    | Struct l -> List.iter (fun (_, u) -> aux u) l
     | Optional ty -> aux ty
     | Named_ty _ | Uint | Int | U8 | U16 | U32 | U64 | I8 | I16 | I32 | I64
     | F32 | F64 | Bool | String | Void | Data _ ->
@@ -95,7 +96,6 @@ end = struct
   let iter_def_rhs f = function
     | Atomic ty -> iter_ty f ty
     | Union l -> List.iter (iter_ty f) l
-    | Struct l -> List.iter (fun (_, u) -> iter_ty f u) l
     | Enum _ -> ()
 
   let iter_out_edges ~graph f (d : ty_def) =
@@ -167,6 +167,46 @@ end = struct
     List.rev !scc_l
 end
 
+(** remove struct constructs that occur inside types, declaring them at
+    toplevel *)
+let flatten_types (defs : ty_def list) : ty_def list =
+  let cnt = ref 0 in
+  let new_defs = ref [] in
+  let addef d = new_defs := d :: !new_defs in
+  let rec aux_ty ~root path ty =
+    let recurse ?(path = path) ty = aux_ty path ~root:false ty in
+    match ty with
+    | Array { ty; len } -> Array { len; ty = recurse ty }
+    | Map (a, b) -> Map (recurse a, recurse b)
+    | Struct l when root ->
+      Struct (List.map (fun (n, ty) -> n, recurse ~path:(n :: path) ty) l)
+    | Struct l ->
+      (* introduce a name for this sub-struct *)
+      let new_name =
+        let path = String.concat "_" @@ List.rev path in
+        Printf.sprintf "%s_%d" path !cnt
+      in
+      incr cnt;
+      (* side definition for this new type *)
+      (let new_def = { name = new_name; def = Atomic (Struct l) } in
+       aux_def new_def);
+      Named_ty { name = new_name; is_void = false }
+    | Optional ty -> Optional (recurse ty)
+    | Named_ty _ | Uint | Int | U8 | U16 | U32 | U64 | I8 | I16 | I32 | I64
+    | F32 | F64 | Bool | String | Void | Data _ ->
+      ty
+  and aux_def ({ name; def } as td) =
+    let def =
+      match def with
+      | Enum _ -> def
+      | Atomic ty -> Atomic (aux_ty ~root:true [ name ] ty)
+      | Union l -> Union (List.map (aux_ty ~root:false [ name ]) l)
+    in
+    addef { td with def }
+  in
+  List.iter aux_def defs;
+  List.rev !new_defs
+
 (** replace `type a void` with `void` in every union it occurs in *)
 let replace_void_defs (defs : ty_def list) : ty_def list =
   let void_types : (string, unit) Hashtbl.t = Hashtbl.create 8 in
@@ -185,6 +225,7 @@ let replace_void_defs (defs : ty_def list) : ty_def list =
       Named_ty { name; is_void = true }
     | Array { ty; len } -> Array { len; ty = recurse ty }
     | Map (a, b) -> Map (recurse a, recurse b)
+    | Struct l -> Struct (List.map (fun (n, ty) -> n, recurse ty) l)
     | Optional ty -> Optional (recurse ty)
     | Named_ty _ | Uint | Int | U8 | U16 | U32 | U64 | I8 | I16 | I32 | I64
     | F32 | F64 | Bool | String | Void | Data _ ->
@@ -195,11 +236,6 @@ let replace_void_defs (defs : ty_def list) : ty_def list =
     | Atomic Void -> td
     | Enum _ -> td
     | Atomic ty -> { td with def = Atomic (set_is_void_tag ty) }
-    | Struct l ->
-      {
-        td with
-        def = Struct (List.map (fun (n, ty) -> n, set_is_void_tag ty) l);
-      }
     | Union l ->
       let l =
         List.map
@@ -246,6 +282,9 @@ let rec pp_ty_expr out = function
   | Array { ty; len = None } -> fpf out "@[[]@[%a@]@]" pp_ty_expr ty
   | Array { ty; len = Some n } -> fpf out "@[[%d]@[%a@]@]" n pp_ty_expr ty
   | Map (a, b) -> fpf out "@[map[@[%a@]]@[%a@]@]" pp_ty_expr a pp_ty_expr b
+  | Struct l ->
+    let pppair out (n, ty) = fpf out "@[<1>%s:@ %a@]" n pp_ty_expr ty in
+    fpf out "{@[<hv>%a@]}" (pplist "" pppair) l
 
 let pp_ty_def out (td : ty_def) : unit =
   let { name; def } = td in
@@ -257,9 +296,6 @@ let pp_ty_def out (td : ty_def) : unit =
       | s, Some i -> fpf out "%s = %d" s i
     in
     fpf out "@[<2>enum %s@ {@[<v>%a@]}@]" name (pplist "" ppc) l
-  | Struct l ->
-    let pppair out (n, ty) = fpf out "@[<1>%s:@ %a@]" n pp_ty_expr ty in
-    fpf out "{@[<hv>%a@]}" (pplist "" pppair) l
   | Union l -> fpf out "@[<2>type %s@ (@[%a@])@]" name (pplist "|" pp_ty_expr) l
 
 (** {2 Parser utils} *)
@@ -280,7 +316,7 @@ module P = struct
       "f64", F64;
       "bool", Bool;
       "void", Void;
-      "string", String;
+      "str", String;
     ]
 
   exception Parse_error of string * loc
