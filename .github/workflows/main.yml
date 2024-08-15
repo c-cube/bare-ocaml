@@ -2,10 +2,8 @@ name: build
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
-    branches:
-      - master
 jobs:
   run:
     name: Build
@@ -13,11 +11,11 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - windows-latest
+          #- windows-latest
           #- macos-latest
         ocaml-compiler:
           - 4.08.x
-          - 4.12.x
+          - 5.02.x
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
