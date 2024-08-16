@@ -1,6 +1,6 @@
 set expandtab
 
-syn keyword     bareKW        type enum
+syn keyword     bareKW        type enum struct enum union
 
 syn match       bareComment "#.*" contains=bareTodo
 
@@ -10,7 +10,7 @@ syn match       bareKW      ":"
 syn match       bareKW      "="
 syn match       bareKW      "|"
 
-syn keyword bareType   uint int u8 i8 u16 i16 u32 i32 u64 i64 f32 f64 map string data bool void
+syn keyword bareType   uint int u8 i8 u16 i16 u32 i32 u64 i64 f32 f64 map str data bool void
 
 syn keyword  bareTodo  contained TODO BUG FIX FIXME NOTE
 

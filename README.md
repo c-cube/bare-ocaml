@@ -2,7 +2,7 @@
 # Bare-OCaml ![build](https://github.com/c-cube/bare/workflows/build/badge.svg)
 
 A simple code generator and runtime library for [BARE](https://baremessages.org/)
-following [the spec](https://datatracker.ietf.org/doc/draft-devault-bare).
+following [the spec](https://datatracker.ietf.org/doc/draft-devault-bare/11/)
 
 - License: MIT.
 - online documentation: https://c-cube.github.io/bare-ocaml/
@@ -31,5 +31,4 @@ following [the spec](https://datatracker.ietf.org/doc/draft-devault-bare).
     In that case, the code for the `Bare` module will be inserted at the beginning
     of the generated code.
 - basic testing (needs to be improved when test vectors are published)
-
 - basic vim syntax files in `data/vim/`
